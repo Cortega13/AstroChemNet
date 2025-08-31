@@ -4,6 +4,7 @@
 This package contains training/testing procedures for training deep neural network surrogate models for astrochemical networks. We use the [UCLCHEM](https://github.com/uclchem/UCLCHEM) chemical network for our datasets. Datasets are available upon request. 
 
 ## Project Structure
+```
 project-name/
 ├── configs/                    # Includes config files containing dataset/model information.
 ├── data/                       # Include your .h5 datasets here for training/testing/inference.
@@ -29,7 +30,7 @@ project-name/
 └── README.md                   # Project documentation
 ├── pyproject.toml              # Project configuration
 └── requirements.txt            # Python Packages needed for this package.
-
+```
 ## Setup Guide
 Clone the repository.
 
