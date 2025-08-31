@@ -1,5 +1,6 @@
 data/*
-!data/.gitkeep
+!data/
+!data/README.md
 
 models/backups/
 grid_folder/
