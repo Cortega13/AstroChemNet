@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
+
 
 class Autoencoder(nn.Module):
     def __init__(self, input_dim=333, latent_dim=12, hidden_dims=(320,160), noise=0.1, dropout=0.0):
@@ -51,3 +53,23 @@ class Autoencoder(nn.Module):
             z += noise
         x_reconstructed = self.decode(z)
         return x_reconstructed
+
+
+def load_autoencoder(GeneralConfig, AEConfig, inference=False):
+    autoencoder = Autoencoder(
+        input_dim=AEConfig.input_dim,
+        latent_dim=AEConfig.latent_dim,
+        hidden_dims=AEConfig.hidden_dims,
+        noise=AEConfig.noise,
+        dropout=AEConfig.dropout,
+    ).to(GeneralConfig.device)
+    if os.path.exists(AEConfig.pretrained_model_path):
+        print("Loading Pretrained Model")
+        autoencoder.load_state_dict(torch.load(AEConfig.pretrained_model_path))
+
+    if inference:
+        autoencoder.eval()
+        for param in autoencoder.parameters():
+            param.requires_grad = False
+    
+    return autoencoder

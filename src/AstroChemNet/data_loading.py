@@ -1,3 +1,6 @@
+"""
+Here we define several data loading methods needed for loading the datasets onto cpu memory and then loading them in batches for the Trainer class.
+"""
 import torch
 import numpy as np
 import pandas as pd
@@ -58,6 +61,10 @@ def save_tensors_to_hdf5(
     tensors: torch.Tensor, 
     category: str
     ):
+    """
+    For convenience, we save the dataset along with the encoded species and indices in tensor format.
+    This allows us to quickly load everything needed to train the emulator.
+    """
     dataset, indices = tensors
     dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "w") as f:
@@ -69,6 +76,9 @@ def load_tensors_from_hdf5(
     GeneralConfig, 
     category: str
     ):
+    """
+    Load saved tensors to quickly run an emulator training session.
+    """
     dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]
@@ -79,6 +89,10 @@ def load_tensors_from_hdf5(
 
 
 class ChunkedShuffleSampler(Sampler):
+    """
+    During training, we want to shuffle the data in chunks for efficiency. This is especially important when our dataset size is similar to our RAM limits.
+    """
+    
     def __init__(self, data_size: int, chunk_size: int, seed: int = 13):
         super().__init__()
         self.data_size = int(data_size)
@@ -121,6 +135,10 @@ class ChunkedShuffleSampler(Sampler):
 
 
 class AutoencoderDataset(Dataset):
+    """
+    This defines the Tensor Dataset for the autoencoder training. We use the new "__getitems__" method which can load all elements in a batch at once.
+    Since our batch sizes are ~10^3, instead of having ~10^3 calls to this function we only have 1.
+    """
     def __init__(
         self,
         data_matrix: torch.Tensor,
@@ -145,6 +163,10 @@ class AutoencoderDataset(Dataset):
 
 
 class EmulatorSequenceDataset(Dataset):
+    """
+    This defines the Tensor Dataset for the emulator training. We use the new "__getitems__" method which can load multiple rows of data at once.
+    Since we reuse rows of data for elements of the training dataset, we can recall the rows on the fly for batches. This reduces memory overhead significantly.
+    """
     def __init__(
         self,
         GeneralConfig,
@@ -188,6 +210,9 @@ class EmulatorSequenceDataset(Dataset):
 
 
 def collate_function(batch):
+    """
+    The collate_function usually pulls from the Tensor Dataset in (features, targets) format. Here we account for the physical parameters as well.
+    """
     if len(batch) == 2:
         features, targets = batch
         return features, targets
@@ -200,6 +225,10 @@ def tensor_to_dataloader(
     training_config,
     torchDataset: Dataset,
     ):
+    """
+    Create a DataLoader for the given Torch Dataset. 
+    """
+
     data_size = len(torchDataset)
     multiplier = training_config.shuffle_chunk_size
     sampler = ChunkedShuffleSampler(data_size, chunk_size=multiplier * data_size)

@@ -1,3 +1,6 @@
+"""
+For simplicity, here we define an Inference script which """
+
 import torch
 import numpy as np
 

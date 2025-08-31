@@ -1,44 +1,22 @@
-import torch
 import os
+import torch
 import numpy as np
 from AstroChemNet import data_processing as dp
 from AstroChemNet import data_loading as dl
-from AstroChemNet.inference import Inference
 from AstroChemNet.loss import Loss
+from AstroChemNet.inference import Inference
 import AstroChemNet.utils as utils
 from AstroChemNet.trainer import (
     AutoencoderTrainer, 
     load_objects,
 )
-from autoencoder.config import (
-    GeneralConfig,
-    AEConfig,
-)
-from autoencoder.nn import (
-    Autoencoder
-)
-
-def load_autoencoder(GeneralConfig, AEConfig, inference=False):
-    autoencoder = Autoencoder(
-        input_dim=AEConfig.input_dim,
-        latent_dim=AEConfig.latent_dim,
-        hidden_dims=AEConfig.hidden_dims,
-        noise=AEConfig.noise,
-        dropout=AEConfig.dropout,
-    ).to(GeneralConfig.device)
-    if os.path.exists(AEConfig.pretrained_model_path):
-        print("Loading Pretrained Model")
-        autoencoder.load_state_dict(torch.load(AEConfig.pretrained_model_path))
-
-    if inference:
-        autoencoder.eval()
-        for param in autoencoder.parameters():
-            param.requires_grad = False
-    
-    return autoencoder
+os.chdir(os.path.join(os.path.dirname(__file__), "../.."))
+from configs.general import GeneralConfig
+from configs.autoencoder import AEConfig
+from nn_architectures.autoencoder import load_autoencoder, Autoencoder
 
 
-if __name__ == "__main__":
+def main(Autoencoder, GeneralConfig, AEConfig):
     processing_functions = dp.Processing(GeneralConfig, AEConfig)
 
     # stoichiometric_matrix = processing_functions.save_stoichiometric_matrix()
@@ -57,7 +35,7 @@ if __name__ == "__main__":
     training_dataloader = dl.tensor_to_dataloader(AEConfig, training_Dataset)
     validation_dataloader = dl.tensor_to_dataloader(AEConfig, validation_Dataset)
 
-    autoencoder = load_autoencoder(GeneralConfig, AEConfig)
+    autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig)
     optimizer, scheduler = load_objects(autoencoder, AEConfig)
     loss_functions = Loss(
         processing_functions,
@@ -81,3 +59,8 @@ if __name__ == "__main__":
     # total_dataset = torch.vstack((training_dataset, validation_dataset))
     # inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
     # processing_functions.save_latents_minmax(AEConfig, total_dataset, inference_functions)
+    
+
+if __name__ == "__main__":
+    # Run main script.
+    main(Autoencoder, GeneralConfig, AEConfig)
