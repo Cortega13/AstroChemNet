@@ -58,7 +58,7 @@ def convertUCLCHEMbaseAvtoAv(
     multiplier = 0.0000964375
     additive = np.multiply(multiplier, physical_parameters[:, density_idx])
     np.add(physical_parameters[:, baseAv_idx], additive, out=physical_parameters[:, baseAv_idx])
-    
+
 
 def reconstruct_emulated_outputs(encoded_inputs, emulated_outputs):
     """

@@ -1,24 +1,58 @@
 ### Note: This package is currently under development. Any and all suggestions for improvements are welcome.
 
+## Surrogate Modeling for Astrochemical Networks.
+This package contains training/testing procedures for training deep neural network surrogate models for astrochemical networks. We use the [UCLCHEM](https://github.com/uclchem/UCLCHEM) chemical network for our datasets. Datasets are available upon request. 
+
+## Project Structure
+project-name/
+├── configs/                    # Includes config files containing dataset/model information.
+├── data/                       # Include your .h5 datasets here for training/testing/inference.
+├── nn_architectures/           # Contains neural network architectures in pytorch nn.Module format.
+├── plots/                      # Plots generated from scripts/analysis/
+├── research/                   # Similar research avenues which were explored.
+├── scripts/                    # Contains all scripts.
+│   └── preprocessing/          # Notebooks for preprocessing dataset before usage.
+│   └── analysis/               # Notebooks for analyzing trained models.
+│   └── train/                  # Scripts for training different models.
+├── src/                        # Source code
+│   └── AstroChemNet/           # Main package
+│       ├── analysis.py/        # Functions for analyzing model testing/inference and producing plots.
+│       ├── data_loading.py/    # Functions for loading data onto cpu and loading efficiently into trainer.
+│       ├── data_processing.py/ # Functions for preprocessing/postprocessing.
+│       ├── inference.py/       # Functions for inferencing models. 
+│       ├── loss.py/            # Loss Functions for training.
+│       ├── trainer.py/         # Main training function following common training procedures.
+│       └── utils.py/           # Less common functions used in preprocessing/analysis.
+├── utils/                      # Saved useful commonly used arrays.
+├── weights/                    # Contains model weights during/after training.
+├── .gitignore                  # What to ignore by git.
+└── README.md                   # Project documentation
+├── pyproject.toml              # Project configuration
+└── requirements.txt            # Python Packages needed for this package.
+
 ## Setup Guide
-Firstly, clone this repository onto your device by running the following command.
+Clone the repository.
 
 ```sh
-git clone https://github.com/Cortega13/ChemSurrogate.git
+git clone https://github.com/Cortega13/AstroChemNet.git
 ```
 
-Then run the following to enter the correct directory.
+Enter the project directory.
 
 ```sh
-cd ChemSurrogate
+cd AstroChemNet
 ```
 
-Next, install the package using pip. Note: No necessary package dependencies are defined yet, so you must download them separately.
+Install the package using pip. Note: No necessary package dependencies are defined yet, so you must download them separately.
 
 ```sh
 pip install -e .
 ```
 
+## Gravitational Collapse Benchmark
+
+## Turbulent Gas Benchmark
+<!-- 
 In order to validate the results of this model, you must download the dataset. The compressed version of this dataset is 9GB. You can download the dataset by downloading data.zip from the following Google Drive link.
 [Click Here to Download Dataset](https://drive.google.com/file/d/1IuEMusFsvDlzqRHD4c5SMUoSv9CJ50gW/view?usp=drive_link)
 You must then place data.zip inside the ChemSurrogate folder and extract it using your preferred method. This will create a data/ folder. Inside the data/ folder are two separate hdf5 files, one named uclchem_rawdata_training.h5 and the other uclchem_rawdata_validation.h5. The first holds 60k models and the second holds 20k models. Information on this dataset is discussed below.
@@ -49,4 +83,4 @@ The validation loss for the results are defined as
 
 loss = abs(actual - predicted) / actual
 
-This loss is calculated for each species and then the mean is calculated. This is calculated for the entire validation set. The species abundances range from 1e-20 to 1.
+This loss is calculated for each species and then the mean is calculated. This is calculated for the entire validation set. The species abundances range from 1e-20 to 1. -->
