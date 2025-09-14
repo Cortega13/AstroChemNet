@@ -8,7 +8,6 @@ from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.backends import cudnn
 import copy
-from torch.profiler import profile, record_function, ProfilerActivity
 import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,6 +33,7 @@ class Trainer:
         """
         Initializes the Trainer class. A class which simplifies training by including all necessary components.
         """
+        self.device = GeneralConfig.device
         self.start_time = datetime.now()
         self.model_config = model_config
 
@@ -175,8 +175,9 @@ class Trainer:
         Training loop for the autoencoder. Runs until the minimum loss stagnates for a number of epochs.
         """
         gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
         for epoch in range(9999999):
             self._run_epoch(epoch)
@@ -185,7 +186,8 @@ class Trainer:
                 break
 
         gc.collect()
-        torch.cuda.empty_cache()
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         print(f"\nTraining Complete. Trial Results: {self.metric_minimum_loss}")
         self.print_final_time()
         self.save_loss_per_epoch()
@@ -207,7 +209,7 @@ class AutoencoderTrainer(Trainer):
         Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder.
         """
         self.num_metadata = GeneralConfig.num_metadata
-        self.num_physical_parameters = GeneralConfig.num_physical_parameters
+        self.num_phys = GeneralConfig.phys
         self.num_species = GeneralConfig.num_species
         self.num_components = AEConfig.latent_dim
         self.gradient_clipping = AEConfig.gradient_clipping
@@ -354,44 +356,21 @@ class EmulatorTrainerSequential(Trainer):
 
         self.model.train()
 
-        # # Set up profiler
-        # with profile(
-        #     activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        #     schedule=torch.profiler.schedule(wait=0, warmup=1, active=1, repeat=1),
-        #     on_trace_ready=torch.profiler.tensorboard_trace_handler("logs"),
-        #     record_shapes=True,
-        #     with_stack=True,
-        #     profile_memory=True,
-        #     with_flops=True
-        # ) as prof:
-        #     for batch_idx, (physical_parameters, features, targets) in enumerate(self.training_dataloader):
-        #         physical_parameters = physical_parameters.to(device, non_blocking=True)
-        #         features = features.to(device, non_blocking=True)
-        #         targets = targets.to(device, non_blocking=True)
-
-        #         with record_function("training_batch"):
-        #             self._run_training_batch(physical_parameters, features, targets)
-
-        #         prof.step()
-
-        #         if batch_idx >= 9:
-        #             break  # Only profile the first 10 batches
-
-        for physical_parameters, features, targets in self.training_dataloader:
-            physical_parameters = physical_parameters.to(device, non_blocking=True)
+        for phys, features, targets in self.training_dataloader:
+            phys = phys.to(device, non_blocking=True)
             features = features.to(device, non_blocking=True)
             targets = targets.to(device, non_blocking=True)
-            self._run_training_batch(physical_parameters, features, targets)
+            self._run_training_batch(phys, features, targets)
 
         tic2 = datetime.now()
 
         self.model.eval()
         with torch.no_grad():
-            for physical_parameters, features, targets in self.validation_dataloader:
-                physical_parameters = physical_parameters.to(device, non_blocking=True)
+            for phys, features, targets in self.validation_dataloader:
+                phys = phys.to(device, non_blocking=True)
                 features = features.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
-                self._run_validation_batch(physical_parameters, features, targets)
+                self._run_validation_batch(phys, features, targets)
 
         toc = datetime.now()
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")

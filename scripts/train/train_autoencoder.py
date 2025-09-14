@@ -12,6 +12,8 @@ from configs.general import GeneralConfig
 from configs.autoencoder import AEConfig
 from nn_architectures.autoencoder import Autoencoder, load_autoencoder  # noqa: F401
 from AstroChemNet.inference import Inference  # noqa: F401
+from AstroChemNet.loss import Loss  # noqa: F401
+from AstroChemNet.trainer import AutoencoderTrainer, load_objects  # noqa: F401
 
 
 def main(Autoencoder: nn.Module, GeneralConfig: GeneralConfig, AEConfig: AEConfig):
@@ -27,38 +29,38 @@ def main(Autoencoder: nn.Module, GeneralConfig: GeneralConfig, AEConfig: AEConfi
     training_dataset = torch.from_numpy(training_np)
     validation_dataset = torch.from_numpy(validation_np)
 
-    # training_Dataset = dl.AutoencoderDataset(training_dataset)
-    # validation_Dataset = dl.AutoencoderDataset(validation_dataset)
+    training_Dataset = dl.AutoencoderDataset(training_dataset)
+    validation_Dataset = dl.AutoencoderDataset(validation_dataset)
 
-    # training_dataloader = dl.tensor_to_dataloader(AEConfig, training_Dataset)
-    # validation_dataloader = dl.tensor_to_dataloader(AEConfig, validation_Dataset)
+    training_dataloader = dl.tensor_to_dataloader(AEConfig, training_Dataset)
+    validation_dataloader = dl.tensor_to_dataloader(AEConfig, validation_Dataset)
 
     autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig)
-    # optimizer, scheduler = load_objects(autoencoder, AEConfig)
-    # loss_functions = Loss(
-    #     processing_functions,
-    #     GeneralConfig,
-    #     AEConfig=AEConfig,
-    # )
-
-    # autoencoder_trainer = AutoencoderTrainer(
-    #     GeneralConfig,
-    #     AEConfig,
-    #     loss_functions,
-    #     autoencoder,
-    #     optimizer,
-    #     scheduler,
-    #     training_dataloader,
-    #     validation_dataloader,
-    # )
-
-    # autoencoder_trainer.train()
-
-    total_dataset = torch.vstack((training_dataset, validation_dataset))
-    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
-    processing_functions.save_latents_minmax(
-        AEConfig, total_dataset, inference_functions
+    optimizer, scheduler = load_objects(autoencoder, AEConfig)
+    loss_functions = Loss(
+        processing_functions,
+        GeneralConfig,
+        AEConfig=AEConfig,
     )
+
+    autoencoder_trainer = AutoencoderTrainer(
+        GeneralConfig,
+        AEConfig,
+        loss_functions,
+        autoencoder,
+        optimizer,
+        scheduler,
+        training_dataloader,
+        validation_dataloader,
+    )
+
+    autoencoder_trainer.train()
+
+    # total_dataset = torch.vstack((training_dataset, validation_dataset))
+    # inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    # processing_functions.save_latents_minmax(
+    #     AEConfig, total_dataset, inference_functions
+    # )
 
 
 if __name__ == "__main__":
