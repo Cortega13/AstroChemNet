@@ -19,6 +19,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(True)
 
+
 class Trainer:
     def __init__(
         self,
@@ -35,24 +36,21 @@ class Trainer:
         """
         self.start_time = datetime.now()
         self.model_config = model_config
-        
+
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.training_dataloader = training_dataloader
         self.validation_dataloader = validation_dataloader
         self.num_validation_elements = len(self.validation_dataloader.dataset)
-                
+
         self.current_dropout_rate = self.model_config.dropout
         self.current_learning_rate = self.model_config.lr
         self.best_weights = None
         self.metric_minimum_loss = np.inf
-        self.epoch_validation_loss = torch.zeros(
-            GeneralConfig.num_species
-        ).to(device)
+        self.epoch_validation_loss = torch.zeros(GeneralConfig.num_species).to(device)
         self.stagnant_epochs = 0
         self.loss_per_epoch = []
-
 
     def save_loss_per_epoch(self):
         """
@@ -61,7 +59,6 @@ class Trainer:
         epochs_path = os.path.splitext(self.model_config.save_model_path)[0] + ".json"
         with open(epochs_path, "w") as f:
             json.dump(self.loss_per_epoch, f, indent=4)
-
 
     def print_final_time(self):
         """
@@ -72,7 +69,6 @@ class Trainer:
         print(f"Total Training Time: {total_time}")
         print(f"Total Epochs: {len(self.loss_per_epoch)}")
 
-
     def _save_checkpoint(self):
         """
         Saves the model's state dictionary to a file.
@@ -81,7 +77,6 @@ class Trainer:
         model_path = os.path.join(self.model_config.save_model_path)
         if self.model_config.save_model:
             torch.save(checkpoint, model_path)
-
 
     def set_dropout_rate(self, dropout_rate):
         """
@@ -92,7 +87,6 @@ class Trainer:
                 module.p = dropout_rate
         self.current_dropout_rate = dropout_rate
 
-
     def _check_early_stopping(self):
         """
         Ends training once the number of stagnant epochs exceeds the patience.
@@ -101,7 +95,6 @@ class Trainer:
             print("Ending training early due to stagnant epochs.")
             return True
         return False
-
 
     def _check_minimum_loss(self):
         """
@@ -114,46 +107,59 @@ class Trainer:
         mean_loss = val_loss.mean().item()
         std_loss = val_loss.std().item()
         max_loss = val_loss.max().item()
-        metric = mean_loss# + std_loss + 0.5*max_loss
-        
+        metric = mean_loss  # + std_loss + 0.5*max_loss
+
         if metric < self.metric_minimum_loss:
             print("**********************")
-            print(f"New Minimum \nMean: {mean_loss:.3e} \nStd: {std_loss:.3e} \nMax: {max_loss:.3e} \nMetric: {metric:.3e} \nPercent Improvement: {(100-metric*100/self.metric_minimum_loss):.3f}%")
+            print(
+                f"New Minimum \nMean: {mean_loss:.3e} \nStd: {std_loss:.3e} \nMax: {max_loss:.3e} \nMetric: {metric:.3e} \nPercent Improvement: {(100 - metric * 100 / self.metric_minimum_loss):.3f}%"
+            )
             self._save_checkpoint()
             self.best_weights = copy.deepcopy(self.model.state_dict())
-            
+
             self.metric_minimum_loss = metric
             self.stagnant_epochs = 0
         else:
             self.stagnant_epochs += 1
-            print(f"Stagnant {self.stagnant_epochs} \nMinimum: {self.metric_minimum_loss:.3e} \nMean: {mean_loss:.3e} \nStd: {std_loss:.3e} \nMax: {max_loss:.3e} \nMetric: {metric:.3e}")
-            
+            print(
+                f"Stagnant {self.stagnant_epochs} \nMinimum: {self.metric_minimum_loss:.3e} \nMean: {mean_loss:.3e} \nStd: {std_loss:.3e} \nMax: {max_loss:.3e} \nMetric: {metric:.3e}"
+            )
+
             if self.stagnant_epochs % self.model_config.dropout_decay_patience == 0:
-                new_dropout = max(self.current_dropout_rate - self.model_config.dropout_reduction_factor, 0.0)
+                new_dropout = max(
+                    self.current_dropout_rate
+                    - self.model_config.dropout_reduction_factor,
+                    0.0,
+                )
                 if new_dropout != self.current_dropout_rate:
                     self.stagnant_epochs = 0
                     self.set_dropout_rate(new_dropout)
-                    
-                    self.current_learning_rate = 1e-3 if new_dropout <= 0.1 else self.model_config.lr
-                    
+
+                    self.current_learning_rate = (
+                        1e-3 if new_dropout <= 0.1 else self.model_config.lr
+                    )
+
                     for param_group in self.optimizer.param_groups:
-                        param_group['lr'] = self.current_learning_rate
-                    
-                    print(f"Decreasing dropout rate to {self.current_dropout_rate:.4f} and settings lr to {self.current_learning_rate:.4f}.")
-            
-            
-            if self.stagnant_epochs == self.model_config.lr_decay_patience+1:
+                        param_group["lr"] = self.current_learning_rate
+
+                    print(
+                        f"Decreasing dropout rate to {self.current_dropout_rate:.4f} and settings lr to {self.current_learning_rate:.4f}."
+                    )
+
+            if self.stagnant_epochs == self.model_config.lr_decay_patience + 1:
                 print("Reverting to previous best weights")
                 self.model.load_state_dict(self.best_weights)
-        
-        self.loss_per_epoch.append({
-            "mean": mean_loss,
-            "std": std_loss,
-            "max": max_loss,
-            "metric": metric,
-            "dropout": self.current_dropout_rate,
-            "learning_rate": self.current_learning_rate,
-        })
+
+        self.loss_per_epoch.append(
+            {
+                "mean": mean_loss,
+                "std": std_loss,
+                "max": max_loss,
+                "metric": metric,
+                "dropout": self.current_dropout_rate,
+                "learning_rate": self.current_learning_rate,
+            }
+        )
         self.epoch_validation_loss.zero_()
         self.scheduler.step(metric)
         print()
@@ -161,10 +167,8 @@ class Trainer:
         print(f"Current Dropout Rate: {self.current_dropout_rate:.4f}")
         print(f"Current Num Epochs: {len(self.loss_per_epoch)}")
 
-
     def _run_epoch(self, epoch):
         return NotImplementedError("This method should be implemented in subclasses.")
-
 
     def train(self):
         """
@@ -201,17 +205,17 @@ class AutoencoderTrainer(Trainer):
     ) -> None:
         """
         Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder.
-        """        
+        """
         self.num_metadata = GeneralConfig.num_metadata
         self.num_physical_parameters = GeneralConfig.num_physical_parameters
         self.num_species = GeneralConfig.num_species
         self.num_components = AEConfig.latent_dim
         self.gradient_clipping = AEConfig.gradient_clipping
-        
+
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
-        
+
         super().__init__(
             GeneralConfig,
             model_config=AEConfig,
@@ -222,7 +226,6 @@ class AutoencoderTrainer(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-
     def _run_training_batch(self, features):
         """
         Runs a training batch where features = targets since this is an autoencoder.
@@ -232,12 +235,11 @@ class AutoencoderTrainer(Trainer):
         loss = self.training_loss(
             outputs,
             features,
-            )
+        )
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
-
 
     def _run_validation_batch(self, features):
         """
@@ -249,13 +251,12 @@ class AutoencoderTrainer(Trainer):
         loss = self.validation_loss(outputs, features)
         self.epoch_validation_loss += loss
 
-
     def _run_epoch(self, epoch):
         """
         Since this is an autoencoder, there are no targets and thus the dataloaderss only have features.
         """
         self.training_dataloader.sampler.set_epoch(epoch)
-        
+
         tic1 = datetime.now()
         self.model.train()
         for features in self.training_dataloader:
@@ -296,8 +297,10 @@ class EmulatorTrainerSequential(Trainer):
         self.validation_loss = loss_functions.validation
         self.latent_dim = AEConfig.latent_dim
         self.gradient_clipping = EMConfig.gradient_clipping
-        self.inverse_latent_components_scaling = processing_functions.inverse_latent_components_scaling
-        
+        self.inverse_latent_components_scaling = (
+            processing_functions.inverse_latent_components_scaling
+        )
+
         super().__init__(
             GeneralConfig,
             model_config=EMConfig,
@@ -308,42 +311,39 @@ class EmulatorTrainerSequential(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-
     def _run_training_batch(self, phys, features, targets):
         """
         Runs a single training batch.
         """
-        self.optimizer.zero_grad()        
-                
+        self.optimizer.zero_grad()
+
         outputs = self.model(phys, features)
-        
+
         outputs = outputs.reshape(-1, self.latent_dim)
         outputs = self.inverse_latent_components_scaling(outputs)
         outputs = self.ae.decode(outputs)
         targets = targets.reshape(-1, 333)
-        
+
         loss = self.training_loss(outputs, targets)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
-        
 
     def _run_validation_batch(self, phys, features, targets):
         """
         Runs a single validation batch.
         """
-        
+
         outputs = self.model(phys, features)
-        
+
         outputs = outputs.reshape(-1, self.latent_dim)
         outputs = self.inverse_latent_components_scaling(outputs)
         outputs = self.ae.decode(outputs)
         outputs = outputs.reshape(targets.size(0), targets.size(1), -1)
-                                
-        loss = self.validation_loss(outputs, targets).mean(dim=0)
-        
-        self.epoch_validation_loss += loss.detach()
 
+        loss = self.validation_loss(outputs, targets).mean(dim=0)
+
+        self.epoch_validation_loss += loss.detach()
 
     def _run_epoch(self, epoch):
         """
@@ -405,7 +405,7 @@ def load_objects(model, config):
         weight_decay=config.weight_decay,
         fused=True,
     )
-    
+
     scheduler = ReduceLROnPlateau(
         optimizer,
         mode="min",

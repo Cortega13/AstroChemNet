@@ -1,0 +1,17 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "charliermarsh.ruff",
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "always"
+        }
+    },
+  "ruff.enable": true,
+  "ruff.organizeImports": true,
+  "python.defaultInterpreterPath": ".venv/bin/python", // or path to your venv
+  "python.envFile": "${workspaceFolder}/.env",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "python.testing.cwd": "${workspaceFolder}"
+}
