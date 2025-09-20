@@ -40,8 +40,12 @@ class Loss:
     ):
         elementwise_loss = torch.abs(outputs - targets)
         elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
-        elementwise_loss = torch.sum(elementwise_loss) / targets.size(0)
-        return elementwise_loss
+
+        mean_loss = torch.sum(elementwise_loss) / targets.size(0)
+
+        worst_loss = elementwise_loss.max(dim=1).values.mean()
+
+        return mean_loss, worst_loss
 
     def elemental_conservation(
         self,
@@ -72,12 +76,15 @@ class Loss:
         self,
         outputs: torch.Tensor,
         targets: torch.Tensor,
+        alpha: float = 2,
     ):
         """
-        This is the custom loss function for the autoencoder. It's a combination of the reconstruction loss and the conservation loss.
+        This is the custom loss function for the autoencoder.
+        It's a combination of the reconstruction loss, conservation loss,
+        and a penalty on the worst-performing species.
         """
 
-        elementwise_loss = self.elementwise_loss(
+        mean_loss, worst_loss = self.elementwise_loss(
             outputs, targets, self.exponential, self.power_weight
         )
 
@@ -85,10 +92,12 @@ class Loss:
             outputs, targets
         )
 
-        total_loss = 1e-3 * (elementwise_loss + conservation_error)
+        # combine everything
+        total_loss = 1e-3 * (mean_loss + alpha * worst_loss + conservation_error)
 
         print(
-            f"Recon: {elementwise_loss.detach():.3e} | Cons: {conservation_error.detach():.3e} | Total: {total_loss.detach():.3e}"
+            f"Recon: {mean_loss.detach():.3e} | Worst: {worst_loss.detach():.3e} "
+            f"| Cons: {conservation_error.detach():.3e} | Total: {total_loss.detach():.3e}"
         )
         return total_loss
 
