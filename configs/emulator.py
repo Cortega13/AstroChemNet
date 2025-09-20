@@ -17,13 +17,13 @@ class EMConfig:
     lr = 5e-4
     lr_decay = 0.5
     lr_decay_patience = 5
-    betas = (0.99, 0.999)
+    betas = (0.9, 0.995)
     weight_decay = 1e-3
     power_weight = 20
-    conservation_weight = 1e3
-    batch_size = 5 * int(512)
+    conservation_weight = 5e2
+    batch_size = 20 * int(512)
     stagnant_epoch_patience = 20
-    gradient_clipping = 2
+    gradient_clipping = 1.0
     dropout_decay_patience = 3
     dropout_reduction_factor = 0.05
     dropout = 0.2

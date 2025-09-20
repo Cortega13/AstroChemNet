@@ -22,24 +22,24 @@ def main():
         AEConfig,
     )
     autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig)
-    # inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
 
-    # training_np, validation_np = dl.load_datasets(GeneralConfig, EMConfig.columns)
-    # training_dataset = dp.preprocessing_emulator_dataset(
-    #     GeneralConfig, EMConfig, training_np, processing_functions, inference_functions
-    # )
-    # validation_dataset = dp.preprocessing_emulator_dataset(
-    #     GeneralConfig,
-    #     EMConfig,
-    #     validation_np,
-    #     processing_functions,
-    #     inference_functions,
-    # )
+    training_np, validation_np = dl.load_datasets(GeneralConfig, EMConfig.columns)
+    training_dataset = dp.preprocessing_emulator_dataset(
+        GeneralConfig, EMConfig, training_np, processing_functions, inference_functions
+    )
+    validation_dataset = dp.preprocessing_emulator_dataset(
+        GeneralConfig,
+        EMConfig,
+        validation_np,
+        processing_functions,
+        inference_functions,
+    )
 
-    # dl.save_tensors_to_hdf5(GeneralConfig, training_dataset, category="training_seq")
-    # dl.save_tensors_to_hdf5(
-    #     GeneralConfig, validation_dataset, category="validation_seq"
-    # )
+    dl.save_tensors_to_hdf5(GeneralConfig, training_dataset, category="training_seq")
+    dl.save_tensors_to_hdf5(
+        GeneralConfig, validation_dataset, category="validation_seq"
+    )
 
     training_dataset, training_indices = dl.load_tensors_from_hdf5(
         GeneralConfig, category="training_seq"

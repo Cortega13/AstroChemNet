@@ -7,11 +7,9 @@ class GeneralConfig:
     working_path = os.path.dirname(
         os.path.dirname((os.path.abspath(__file__)))
     )  # The path to the root folder of the project.
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset_path = os.path.join(working_path, "data/grav_collapse_clean.h5")
 
-    num_timesteps_per_model = 296  # Duration that each model runs for. Multiply by timestep_duration to get total evolution time.
-    timestep_duration = 92.9  # In years
     physical_parameter_ranges = {
         "Density": (68481, 1284211415),  # H nuclei per cm^3.
         "Radfield": (1e-4, 26),  # Habing field.

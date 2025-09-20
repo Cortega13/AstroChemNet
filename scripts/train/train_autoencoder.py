@@ -56,13 +56,14 @@ def main(Autoencoder: nn.Module, GeneralConfig: GeneralConfig, AEConfig: AEConfi
 
     autoencoder_trainer.train()
 
-    # total_dataset = torch.vstack((training_dataset, validation_dataset))
-    # inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
-    # processing_functions.save_latents_minmax(
-    #     AEConfig, total_dataset, inference_functions
-    # )
+    total_dataset = torch.vstack((training_dataset, validation_dataset))
+    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    processing_functions.save_latents_minmax(
+        AEConfig, total_dataset, inference_functions
+    )
 
 
 if __name__ == "__main__":
+    print(f"Device: {GeneralConfig.device}")
     # Run main script.
     main(Autoencoder, GeneralConfig, AEConfig)

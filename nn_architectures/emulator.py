@@ -5,7 +5,7 @@ import os
 
 class Emulator(nn.Module):
     def __init__(self, input_dim=18, output_dim=14, hidden_dim=32, dropout=0.0):
-        super(Emulator, self).__init__()
+        super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -15,6 +15,7 @@ class Emulator(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, output_dim),
         )
+        # self.gate_layer = nn.Linear(input_dim, output_dim)  # new
 
     def forward(self, phys, latents):
         B, T, P = phys.shape
@@ -24,7 +25,11 @@ class Emulator(nn.Module):
         for t in range(T):
             current_phys = phys[:, t, :]  # [B, P]
             input = torch.cat([current_phys, latents], dim=1)  # [B, P+L]
-            latents = latents + self.net(input)
+
+            update = self.net(input)  # [B, L]
+            # gate = torch.sigmoid(self.gate_layer(input))  # [B, L]
+            latents = latents + update  # gated residual
+
             outputs[:, t, :] = latents
 
         return outputs

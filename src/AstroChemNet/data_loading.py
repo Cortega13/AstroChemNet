@@ -162,8 +162,11 @@ class EmulatorSequenceDataset(Dataset):
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ):
-        self.data_matrix = data_matrix
-        self.data_indices = data_indices
+        self.device = GeneralConfig.device
+        # self.data_matrix = data_matrix.to(self.device).contiguous()
+        # self.data_indices = data_indices.to(self.device).contiguous()
+        self.data_matrix = data_matrix.contiguous()
+        self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
         self.num_metadata = GeneralConfig.num_metadata
         self.num_phys = GeneralConfig.num_phys
@@ -182,7 +185,7 @@ class EmulatorSequenceDataset(Dataset):
         return self.num_datapoints
 
     def __getitems__(self, indices: list):
-        indices = torch.tensor(indices, dtype=torch.long)
+        indices = torch.tensor(indices, dtype=torch.long, device=self.device)
 
         data_indices = self.data_indices[indices]
 
@@ -224,7 +227,7 @@ def tensor_to_dataloader(
         torchDataset,
         batch_size=training_config.batch_size,
         pin_memory=True,
-        num_workers=0,
+        num_workers=12,
         in_order=False,
         sampler=sampler,
         collate_fn=collate_function,

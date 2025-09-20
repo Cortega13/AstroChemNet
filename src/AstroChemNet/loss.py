@@ -38,7 +38,6 @@ class Loss:
         exponential: torch.Tensor,
         power_weight: torch.Tensor,
     ):
-        # return ((torch.abs(outputs - targets))**2).sum() / targets.size(0)
         elementwise_loss = torch.abs(outputs - targets)
         elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
         elementwise_loss = torch.sum(elementwise_loss) / targets.size(0)

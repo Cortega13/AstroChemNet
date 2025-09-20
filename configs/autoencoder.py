@@ -34,8 +34,8 @@ class AEConfig:
     # Paths
     save_model = True
     pretrained_model_path = os.path.join(
-        GeneralConfig.working_path, "weights/autoencodercons.pth"
+        GeneralConfig.working_path, "weights/autoencoder.pth"
     )
     save_model_path = os.path.join(
-        GeneralConfig.working_path, "weights/autoencodercons.pth"
+        GeneralConfig.working_path, "weights/autoencoder.pth"
     )

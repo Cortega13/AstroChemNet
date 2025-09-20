@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import os
 import gc
 from datetime import datetime
@@ -9,9 +10,6 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.backends import cudnn
 import copy
 import json
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -48,7 +46,9 @@ class Trainer:
         self.current_learning_rate = self.model_config.lr
         self.best_weights = None
         self.metric_minimum_loss = np.inf
-        self.epoch_validation_loss = torch.zeros(GeneralConfig.num_species).to(device)
+        self.epoch_validation_loss = torch.zeros(GeneralConfig.num_species).to(
+            self.device
+        )
         self.stagnant_epochs = 0
         self.loss_per_epoch = []
 
@@ -167,6 +167,7 @@ class Trainer:
         print(f"Current Dropout Rate: {self.current_dropout_rate:.4f}")
         print(f"Current Num Epochs: {len(self.loss_per_epoch)}")
 
+    @abstractmethod
     def _run_epoch(self, epoch):
         return NotImplementedError("This method should be implemented in subclasses.")
 
@@ -262,14 +263,14 @@ class AutoencoderTrainer(Trainer):
         tic1 = datetime.now()
         self.model.train()
         for features in self.training_dataloader:
-            features = features[0].to(device, non_blocking=True)
+            features = features[0].to(self.device, non_blocking=True)
             self._run_training_batch(features)
 
         tic2 = datetime.now()
         self.model.eval()
         with torch.no_grad():
             for features in self.validation_dataloader:
-                features = features[0].to(device, non_blocking=True)
+                features = features[0].to(self.device, non_blocking=True)
                 self._run_validation_batch(features)
 
         toc = datetime.now()
@@ -357,9 +358,9 @@ class EmulatorTrainerSequential(Trainer):
         self.model.train()
 
         for phys, features, targets in self.training_dataloader:
-            phys = phys.to(device, non_blocking=True)
-            features = features.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
+            phys = phys.to(self.device, non_blocking=True)
+            features = features.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
             self._run_training_batch(phys, features, targets)
 
         tic2 = datetime.now()
@@ -367,9 +368,9 @@ class EmulatorTrainerSequential(Trainer):
         self.model.eval()
         with torch.no_grad():
             for phys, features, targets in self.validation_dataloader:
-                phys = phys.to(device, non_blocking=True)
-                features = features.to(device, non_blocking=True)
-                targets = targets.to(device, non_blocking=True)
+                phys = phys.to(self.device, non_blocking=True)
+                features = features.to(self.device, non_blocking=True)
+                targets = targets.to(self.device, non_blocking=True)
                 self._run_validation_batch(phys, features, targets)
 
         toc = datetime.now()

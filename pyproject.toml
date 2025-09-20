@@ -3,13 +3,13 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["ChemSurrogate"]
+packages = ["AstroChemNet"]
 package-dir = {"" = "src"}
 
 [project]
-name = "ChemSurrogate"
+name = "AstroChemNet"
 version = "0.1.0"
-description = "A surrogate model for UCLChem."
+description = "A surrogate model for UCLCHEM."
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = []
