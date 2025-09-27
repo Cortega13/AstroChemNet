@@ -9,21 +9,53 @@ class Inference:
     def __init__(
         self, GeneralConfig, processing_functions, autoencoder=None, emulator=None
     ):
+        self.should_reconstruct_atomic_abundances = False
         self.device = GeneralConfig.device
         self.autoencoder = autoencoder
         self.emulator = emulator
 
+        # Scaling functions
         self.inverse_abundances_scaling = (
             processing_functions.inverse_abundances_scaling
         )
         self.physical_parameter_scaling = (
             processing_functions.physical_parameter_scaling
         )
-
         self.latent_components_scaling = processing_functions.latent_components_scaling
         self.inverse_latent_components_scaling = (
             processing_functions.inverse_latent_components_scaling
         )
+
+        # Load matrices
+        stoichiometric_matrix = np.load(GeneralConfig.stoichiometric_matrix_path)
+        molecular_matrix = np.load(GeneralConfig.molecular_matrix_path)
+
+        self.molecular_matrix = torch.tensor(
+            molecular_matrix, dtype=torch.float32, device=self.device
+        )
+
+        # Define atomic species and indices
+        atomic_species = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
+        self.atomic_indices = torch.tensor(
+            [GeneralConfig.species.index(sp) for sp in atomic_species],
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.elemental_indices = torch.arange(len(atomic_species), device=self.device)
+
+        # Elemental abundances
+        elemental_abundances = GeneralConfig.initial_abundances @ stoichiometric_matrix
+        self.elemental_abundances = torch.tensor(
+            elemental_abundances, dtype=torch.float32, device=self.device
+        )
+
+    def reconstruct_atomic_abundances(self, tensor):
+        atoms = self.elemental_abundances - (tensor @ self.molecular_matrix)
+        tensor = tensor.index_copy(
+            1, self.atomic_indices, atoms[:, self.elemental_indices]
+        )
+        tensor = torch.clamp(tensor, min=1e-20)
+        return tensor
 
     def convert_to_tensor(self, inputs):
         if isinstance(inputs, np.ndarray):
@@ -48,6 +80,8 @@ class Inference:
             latents = self.convert_to_tensor(latents)
             scaled = self.autoencoder.decode(latents)
             abundances = self.inverse_abundances_scaling(scaled)
+            if self.should_reconstruct_atomic_abundances:
+                abundances = self.reconstruct_atomic_abundances(abundances)
 
         return abundances.view(B, T, -1) if reshaped else abundances
 

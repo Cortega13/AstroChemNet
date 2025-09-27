@@ -344,7 +344,7 @@ class EmulatorTrainerSequential(Trainer):
         outputs = self.ae.decode(outputs)
         outputs = outputs.reshape(targets.size(0), targets.size(1), -1)
 
-        loss = self.validation_loss(outputs, targets).mean(dim=0)
+        loss = self.validation_loss(outputs, targets, emulator=True).mean(dim=0)
 
         self.epoch_validation_loss += loss.detach()
 
