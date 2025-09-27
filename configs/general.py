@@ -30,6 +30,7 @@ class GeneralConfig:
         working_path, "utils/stoichiometric_matrix.npy"
     )
     stoichiometric_matrix = np.load(stoichiometric_matrix_path)
+    molecular_matrix_path = os.path.join(working_path, "utils/molecular_matrix.npy")
 
     metadata = ["Index", "Model", "Time"]
     phys = list(physical_parameter_ranges.keys())

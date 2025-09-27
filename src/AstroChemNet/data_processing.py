@@ -63,6 +63,19 @@ class Processing:
                 log_param_max - log_param_min
             )
 
+    def jit_abundances_scaling(
+        self,
+        abundances: torch.Tensor,
+    ):
+        """
+        Abundances are log10'd and then minmax scaled to be within [0, 1].
+        """
+        abundances = torch.log10(abundances)
+        abundances = (abundances - self.abundances_min) / (
+            self.abundances_max - self.abundances_min
+        )
+        return abundances
+
     def abundances_scaling(
         self,
         abundances: np.ndarray,

@@ -47,6 +47,7 @@ def load_emulator(Emulator: Emulator, GeneralConfig, EMConfig, inference=False):
             torch.load(EMConfig.pretrained_model_path, map_location=torch.device("cpu"))
         )
     if inference:
+        print("Setting Emulator to Inference Mode")
         emulator.eval()
         for param in emulator.parameters():
             param.requires_grad = False

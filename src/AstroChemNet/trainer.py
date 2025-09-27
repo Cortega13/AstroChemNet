@@ -327,7 +327,7 @@ class EmulatorTrainerSequential(Trainer):
         outputs = self.ae.decode(outputs)
         targets = targets.reshape(-1, 333)
 
-        loss = self.training_loss(outputs, targets)
+        loss = self.training_loss(outputs, targets, emulator=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()

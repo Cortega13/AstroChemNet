@@ -14,14 +14,14 @@ class EMConfig:
     window_size = 240
 
     # Hyperparameters
-    lr = 5e-4
+    lr = 1e-3
     lr_decay = 0.5
     lr_decay_patience = 5
     betas = (0.9, 0.995)
     weight_decay = 1e-3
     power_weight = 20
     conservation_weight = 5e2
-    batch_size = 20 * int(512)
+    batch_size = 6 * int(512)
     stagnant_epoch_patience = 20
     gradient_clipping = 1.0
     dropout_decay_patience = 3

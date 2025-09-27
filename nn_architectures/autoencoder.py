@@ -79,6 +79,7 @@ def load_autoencoder(
         )
 
     if inference:
+        print("Setting Autoencoder to Inference Mode")
         autoencoder.eval()
         for param in autoencoder.parameters():
             param.requires_grad = False

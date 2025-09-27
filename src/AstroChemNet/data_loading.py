@@ -163,10 +163,10 @@ class EmulatorSequenceDataset(Dataset):
         data_indices: torch.Tensor,
     ):
         self.device = GeneralConfig.device
-        # self.data_matrix = data_matrix.to(self.device).contiguous()
-        # self.data_indices = data_indices.to(self.device).contiguous()
-        self.data_matrix = data_matrix.contiguous()
-        self.data_indices = data_indices.contiguous()
+        self.data_matrix = data_matrix.to(self.device).contiguous()
+        self.data_indices = data_indices.to(self.device).contiguous()
+        # self.data_matrix = data_matrix.contiguous()
+        # self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
         self.num_metadata = GeneralConfig.num_metadata
         self.num_phys = GeneralConfig.num_phys
@@ -226,8 +226,8 @@ def tensor_to_dataloader(
     dataloader = DataLoader(
         torchDataset,
         batch_size=training_config.batch_size,
-        pin_memory=True,
-        num_workers=12,
+        # pin_memory=True,
+        num_workers=0,
         in_order=False,
         sampler=sampler,
         collate_fn=collate_function,
