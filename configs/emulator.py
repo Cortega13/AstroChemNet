@@ -26,11 +26,11 @@ class EMConfig:
     gradient_clipping = 1.0
     dropout_decay_patience = 3
     dropout_reduction_factor = 0.05
-    dropout = 0.2
+    dropout = 0.0
     shuffle = True
     shuffle_chunk_size = 1
 
     # Paths
-    save_model = True
+    save_model = False
     pretrained_model_path = os.path.join(GeneralConfig.working_path, "weights/mlp.pth")
     save_model_path = os.path.join(GeneralConfig.working_path, "weights/mlp.pth")

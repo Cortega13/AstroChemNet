@@ -6,32 +6,14 @@ class Loss:
     def __init__(self, processing_functions, GeneralConfig, ModelConfig=None):
         device = GeneralConfig.device
         stoichiometric_matrix = np.load(GeneralConfig.stoichiometric_matrix_path)
-        molecular_matrix = np.load(GeneralConfig.molecular_matrix_path)
         self.stoichiometric_matrix = torch.tensor(
             stoichiometric_matrix, dtype=torch.float32, device=device
         )
-        self.molecular_matrix = torch.tensor(
-            molecular_matrix, dtype=torch.float32, device=device
-        )
-        atomic_species = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
-        self.atomic_indices = torch.tensor(
-            [GeneralConfig.species.index(sp) for sp in atomic_species],
-            dtype=torch.long,
-            device=device,
-        )
-        self.elemental_indices = torch.arange(len(atomic_species), device=device)
-
-        elemental_abundances = GeneralConfig.initial_abundances @ stoichiometric_matrix
-        self.elemental_abundances = torch.tensor(
-            elemental_abundances, dtype=torch.float32, device=device
-        )
-
         self.exponential = torch.log(torch.tensor(10, device=device).float())
 
         self.inverse_abundances_scaling = (
             processing_functions.inverse_abundances_scaling
         )
-        self.abundances_scaling = processing_functions.jit_abundances_scaling
 
         if ModelConfig:
             self.power_weight = torch.tensor(
@@ -82,34 +64,17 @@ class Loss:
 
         return torch.sum(diff) / tensor1.size(0)
 
-    def _emulator_outputs_reconstruction(self, output: torch.Tensor):
-        unscaled_output = self.inverse_abundances_scaling(output)
-
-        atoms = self.elemental_abundances - (unscaled_output @ self.molecular_matrix)
-
-        unscaled_output = unscaled_output.index_copy(
-            1, self.atomic_indices, atoms[:, self.elemental_indices]
-        )
-
-        unscaled_output = torch.clamp(unscaled_output, min=1e-20)
-
-        reconstructed_output = self.abundances_scaling(unscaled_output)
-        return reconstructed_output
-
     def training(
         self,
         outputs: torch.Tensor,
         targets: torch.Tensor,
         alpha: float = 2,
-        emulator: bool = False,
     ):
         """
         This is the custom loss function for the autoencoder.
         It's a combination of the reconstruction loss, conservation loss,
         and a penalty on the worst-performing species.
         """
-        if emulator:
-            outputs = self._emulator_outputs_reconstruction(outputs)
 
         mean_loss, worst_loss = self.elementwise_loss(
             outputs, targets, self.exponential, self.power_weight
@@ -120,7 +85,7 @@ class Loss:
         )
 
         # combine everything
-        total_loss = 1e-3 * (mean_loss + alpha * worst_loss)
+        total_loss = 1e-3 * (mean_loss + alpha * worst_loss + conservation_error)
 
         print(
             f"Recon: {mean_loss.detach():.3e} | Worst: {worst_loss.detach():.3e} "

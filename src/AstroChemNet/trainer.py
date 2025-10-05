@@ -327,7 +327,7 @@ class EmulatorTrainerSequential(Trainer):
         outputs = self.ae.decode(outputs)
         targets = targets.reshape(-1, 333)
 
-        loss = self.training_loss(outputs, targets, emulator=True)
+        loss = self.training_loss(outputs, targets)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
@@ -342,9 +342,9 @@ class EmulatorTrainerSequential(Trainer):
         outputs = outputs.reshape(-1, self.latent_dim)
         outputs = self.inverse_latent_components_scaling(outputs)
         outputs = self.ae.decode(outputs)
-        outputs = outputs.reshape(targets.size(0), targets.size(1), -1)
+        targets = targets.reshape(-1, 333)
 
-        loss = self.validation_loss(outputs, targets, emulator=True).mean(dim=0)
+        loss = self.validation_loss(outputs, targets).mean(dim=0)
 
         self.epoch_validation_loss += loss.detach()
 

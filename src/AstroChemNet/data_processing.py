@@ -246,20 +246,6 @@ class Processing:
         np.save(self.stoichiometric_matrix_path, stoichiometric_matrix.T)
         return stoichiometric_matrix.T
 
-    def build_molecular_matrix(self):
-        """
-        Builds the molecular matrix M from the stoichiometric matrix S.
-        """
-        elements = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
-        S = self.build_stoichiometric_matrix()
-        M = S.copy()
-        for j, sp in enumerate(self.species):
-            sp_clean = sp.replace("BULK_", "").replace("SURF_", "")
-            if sp_clean in elements:
-                e_idx = elements.index(sp_clean)
-                M[j, e_idx] = 0
-        return M
-
 
 @njit
 def calculate_emulator_indices(
