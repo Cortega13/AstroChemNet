@@ -1,9 +1,11 @@
-import pandas as pd
-import numpy as np
-import torch
-import AstroChemNet.utils as utils
 import os
 import sys
+
+import numpy as np
+import pandas as pd
+import torch
+
+import AstroChemNet.utils as utils
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 os.chdir(project_root)

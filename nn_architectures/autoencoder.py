@@ -1,7 +1,8 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import os
 
 
 class Autoencoder(nn.Module):
@@ -63,7 +64,7 @@ class Autoencoder(nn.Module):
 
 
 def load_autoencoder(
-    Autoencoder: Autoencoder, GeneralConfig, AEConfig, inference=False
+    Autoencoder: type[Autoencoder], GeneralConfig, AEConfig, inference=False
 ):
     autoencoder = Autoencoder(
         input_dim=AEConfig.input_dim,

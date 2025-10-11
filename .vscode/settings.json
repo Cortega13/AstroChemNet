@@ -1,17 +1,74 @@
 {
+  // --- Formatting ---
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "charliermarsh.ruff",
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-            "source.fixAll": "always"
-        }
-    },
+
+  // --- Python-specific formatting & fixes ---
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+
+  // --- Ruff settings ---
   "ruff.enable": true,
+  "ruff.fixAll": true,
   "ruff.organizeImports": true,
-  "python.defaultInterpreterPath": ".venv/bin/python", // or path to your venv
+
+  // --- Python environment ---
+  "python.defaultInterpreterPath": ".venv/bin/python", // or full path to your virtualenv
   "python.envFile": "${workspaceFolder}/.env",
+
+  // --- Working directory setup ---
   "terminal.integrated.cwd": "${workspaceFolder}",
-  "python.testing.cwd": "${workspaceFolder}"
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.analysis.extraPaths": ["."]
+
+  // --- Ensure PYTHONPATH points to project root ---
+  ,"terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+    // --- Editor UX ---
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "editor.tabSize": 4,
+  "editor.rulers": [], // matches Ruff’s line length
+  "editor.wordWrap": "on",
+  "editor.minimap.enabled": false,
+  "workbench.editor.enablePreview": false,
+
+  // --- Python & Jupyter ---
+  "python.analysis.typeCheckingMode": "basic", // or "strict" for advanced checking
+  "python.analysis.autoImportCompletions": true,
+  "jupyter.askForKernelRestart": false,
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+
+  // --- Testing ---
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+  // --- IntelliSense speed ---
+  "python.analysis.completeFunctionParens": true,
+  "python.analysis.memory.keepLibraryAst": false,
+
+  // --- Auto-import and fixes ---
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "python.terminal.activateEnvironment": true,
+  "autoDocstring.docstringFormat": "google",
+  "autoDocstring.generateDocstringOnEnter": true,
+  "autoDocstring.startOnNewLine": true,
+  "autoDocstring.includeName": true,
+  "autoDocstring.includeExtendedSummary": false
 }

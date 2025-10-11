@@ -1,15 +1,16 @@
-from abc import abstractmethod
-import os
+import copy
 import gc
+import json
+import os
+from abc import abstractmethod
 from datetime import datetime
+
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 from torch import optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.backends import cudnn
-import copy
-import json
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 
 cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True

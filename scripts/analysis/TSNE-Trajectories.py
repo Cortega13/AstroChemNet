@@ -1,19 +1,18 @@
-import sys
 import os
+import sys
 
+import AstroChemNet.data_loading as dl
 import AstroChemNet.data_processing as dp
 from AstroChemNet.inference import Inference
-import AstroChemNet.data_loading as dl
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 os.chdir(project_root)
 sys.path.insert(0, project_root)
 
-from configs.general import GeneralConfig
 from configs.autoencoder import AEConfig
 from configs.emulator import EMConfig
+from configs.general import GeneralConfig
 from nn_architectures.autoencoder import Autoencoder, load_autoencoder
-
 
 autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig, inference=True)
 

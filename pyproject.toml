@@ -13,3 +13,21 @@ description = "A surrogate model for UCLCHEM."
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = []
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
+fix = true
+show-fixes = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "D"]
+ignore = ["E501", "D105", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore import-order warnings and undefined variables in notebooks
+"*.ipynb" = ["E402", "F821"]
+# Ignore import-order warnings in analysis scripts
+"scripts/analysis/*.py" = ["E402"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

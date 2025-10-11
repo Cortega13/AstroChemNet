@@ -2,13 +2,14 @@
 Here we define several data loading methods needed for loading the datasets onto cpu memory and then loading them in batches for the Trainer class.
 """
 
-import torch
+import gc
+import os
+
+import h5py
 import numpy as np
 import pandas as pd
-import os
-import gc
-import h5py
-from torch.utils.data import Dataset, DataLoader, Sampler
+import torch
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 
 def load_datasets(

@@ -1,22 +1,29 @@
-import os
+"""Script to train an autoencoder."""
+
 import torch
-from AstroChemNet import data_processing as dp
+
 from AstroChemNet import data_loading as dl
-import sys
-from torch import nn
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-os.chdir(project_root)
-sys.path.insert(0, project_root)
-from configs.general import GeneralConfig
+from AstroChemNet import data_processing as dp
+from AstroChemNet.inference import Inference
+from AstroChemNet.loss import Loss
+from AstroChemNet.trainer import AutoencoderTrainer, load_objects
 from configs.autoencoder import AEConfig
-from nn_architectures.autoencoder import Autoencoder, load_autoencoder  # noqa: F401
-from AstroChemNet.inference import Inference  # noqa: F401
-from AstroChemNet.loss import Loss  # noqa: F401
-from AstroChemNet.trainer import AutoencoderTrainer, load_objects  # noqa: F401
+from configs.general import GeneralConfig
+from nn_architectures.autoencoder import Autoencoder, load_autoencoder
 
 
-def main(Autoencoder: nn.Module, GeneralConfig: GeneralConfig, AEConfig: AEConfig):
+def main(
+    Autoencoder: type[Autoencoder],
+    GeneralConfig: type[GeneralConfig],
+    AEConfig: type[AEConfig],
+):
+    """Main _summary_.
+
+    Args:
+        Autoencoder (type[Autoencoder]): nn.module of Autoencoder
+        GeneralConfig (type[GeneralConfig]): ConfigurationFile
+        AEConfig (type[AEConfig]): Autoencoder-specific configuration file.
+    """
     processing_functions = dp.Processing(GeneralConfig, AEConfig)
 
     # stoichiometric_matrix = processing_functions.save_stoichiometric_matrix()
@@ -40,7 +47,7 @@ def main(Autoencoder: nn.Module, GeneralConfig: GeneralConfig, AEConfig: AEConfi
     loss_functions = Loss(
         processing_functions,
         GeneralConfig,
-        AEConfig=AEConfig,
+        ModelConfig=AEConfig,
     )
 
     autoencoder_trainer = AutoencoderTrainer(

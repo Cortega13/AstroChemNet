@@ -1,6 +1,7 @@
 import os
-from configs.general import GeneralConfig
+
 from configs.autoencoder import AEConfig
+from configs.general import GeneralConfig
 
 
 class EMConfig:

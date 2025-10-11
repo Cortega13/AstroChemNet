@@ -3,11 +3,13 @@ We grouped all the data processing functions into a single class for better orga
 We have the preprocessing and postprocessing functions. These include scaling the abundances and physical parameters.
 """
 
+import gc
+import re
+
 import numpy as np
 import torch
-import re
-import gc
 from numba import njit
+
 from .inference import Inference
 
 

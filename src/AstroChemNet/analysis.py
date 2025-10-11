@@ -1,10 +1,12 @@
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import torch
-from .configs import DatasetConfig, PredefinedTensors
+
 from . import data_processing as dp
+from .configs import DatasetConfig, PredefinedTensors
 
 
 def sample_initial_conditions(
