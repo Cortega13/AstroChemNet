@@ -6,3 +6,5 @@ models/backups/
 grid_folder/
 *.pyc
 __pycache__/
+
+.ruff_cache/
