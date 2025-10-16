@@ -21,7 +21,7 @@ show-fixes = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "D"]
-ignore = ["E501", "D105", "D107"]
+ignore = ["E501", "D105", "D107", "F401"]
 
 [tool.ruff.lint.per-file-ignores]
 # Ignore import-order warnings and undefined variables in notebooks

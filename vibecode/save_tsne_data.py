@@ -19,11 +19,10 @@ del training_np, validation_np
 
 unique_models = np.unique(combined_np[:, 1])
 
-print(f"Total tracers: {len(unique_models)}")
-
 selected_models = unique_models  # Use all tracers
 
 tracer_species = []
+tracer_log_densities = []
 
 for model in selected_models:
     mask = combined_np[:, 1] == model
@@ -31,6 +30,8 @@ for model in selected_models:
     species_data = subset[:, -GeneralConfig.num_species :].copy()
     log_species = np.log10(species_data + 1e-20)
     tracer_species.append(log_species.flatten())
+    final_density = subset[-1, GeneralConfig.num_metadata]
+    tracer_log_densities.append(np.log10(final_density))
 
 species_data = np.array(tracer_species)
 
@@ -42,10 +43,16 @@ pca_reduced = pca.fit_transform(species_data)
 tsne = TSNE(n_components=2, random_state=42, perplexity=100)
 embedded = tsne.fit_transform(pca_reduced)
 
-# Count tracers where t-SNE 1 is between -24 and -16
-tsne1_values = embedded[:, 0]
-count_in_strip = np.sum((tsne1_values >= -24) & (tsne1_values <= -16))
-
-print(
-    f"Number of tracers in vertical strip (t-SNE 1 between -24 and -16): {count_in_strip}"
+# Save data: tracer index (model ID), tsne1, tsne2, log_density
+data = np.column_stack(
+    (unique_models, embedded[:, 0], embedded[:, 1], tracer_log_densities)
 )
+np.savetxt(
+    "tsne_data.csv",
+    data,
+    delimiter=",",
+    header="tracer_index,tsne1,tsne2,log_density",
+    comments="",
+)
+
+print("Data saved to tsne_data.csv")

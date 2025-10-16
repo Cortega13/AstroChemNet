@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+# sys.path.append(".")
 import AstroChemNet.utils as utils
 from configs.general import GeneralConfig
 
@@ -56,20 +57,17 @@ df.insert(0, "Index", range(len(df)))
 df = df[["Index", "Model", "Time"] + params + species]
 
 
-tracers = df["Model"].unique()
-np.random.shuffle(tracers)
+# Load train and val indices from vibecode
+train_indices = np.loadtxt("scripts/preprocessing/train_indices.csv", dtype=int)
+val_indices = np.loadtxt("scripts/preprocessing/val_indices.csv", dtype=int)
 
-# 75% train, 25% validation split
-split_idx = int(len(tracers) * 0.75)
-
-train_tracers = tracers[:split_idx]
-val_tracers = tracers[split_idx:]
-
-train_df = df[df["Model"].isin(train_tracers)]
-val_df = df[df["Model"].isin(val_tracers)]
+train_df = df[df["Model"].isin(train_indices)]
+val_df = df[df["Model"].isin(val_indices)]
 
 train_df = train_df.reset_index(drop=True)
 val_df = val_df.reset_index(drop=True)
 
-train_df.to_hdf("data/grav_collapse_clean.h5", key="train", mode="w")
-val_df.to_hdf("data/grav_collapse_clean.h5", key="val", mode="a")
+train_df.to_hdf("data/grav_collapse_clean_int.h5", key="train", mode="w")
+val_df.to_hdf("data/grav_collapse_clean_int.h5", key="val", mode="a")
+
+print("Data split by indices and saved to data/grav_collapse_clean_int.h5")

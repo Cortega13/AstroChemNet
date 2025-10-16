@@ -13,9 +13,7 @@ def sample_initial_conditions(
     n_samples: int = 100000,
     convert_base_av: bool = True,
 ):
-    """
-    Generate initial conditions for the parameter sampling plots where physical conditions are varied.
-    """
+    """Generate initial conditions for the parameter sampling plots where physical conditions are varied."""
     inputs = np.random.uniform(
         0, 1, size=(n_samples, DatasetConfig.num_physical_parameters)
     )
@@ -33,9 +31,7 @@ def sample_initial_conditions(
 
 
 def add_timesteps_to_conditions(initial_conditions: np.array, num_timesteps: int = 1):
-    """
-    Adds a time column to the initial conditions tensor.
-    """
+    """Adds a time column to the initial conditions tensor."""
     time_as_fraction = num_timesteps / DatasetConfig.num_timesteps_per_model
     batch_size = initial_conditions.shape[0]
     time_column = np.full((batch_size, 1), time_as_fraction)
@@ -47,8 +43,7 @@ def add_timesteps_to_conditions(initial_conditions: np.array, num_timesteps: int
 def add_multiple_timesteps_to_conditions(
     initial_conditions: torch.Tensor, num_timesteps: int = 95
 ):
-    """
-    Expands the initial conditions tensor to include copies for each timestep.
+    """Expands the initial conditions tensor to include copies for each timestep.
     Adds a time column to the expanded tensor.
     """
     time_values = (
@@ -81,10 +76,7 @@ def benchmark_speed(DATASET, AE_CONFIG, EMULATOR_CONFIG):
 def histogram_physical_parameters(
     sampled_physical_parameters: np.array, savefig_path: str = None
 ):
-    """
-    Generate histograms for the sampled physical conditions to visualize distribution.
-    """
-
+    """Generate histograms for the sampled physical conditions to visualize distribution."""
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     for i, param in enumerate(DatasetConfig.physical_parameters):
         row = i // 2
@@ -110,8 +102,7 @@ def plot_abundances_vs_time_comparison(
     species_of_interest: list,
     output_path: str = None,
 ):
-    """
-    Plotting the reconstructed and original abundances on a chemical evolution plot.
+    """Plotting the reconstructed and original abundances on a chemical evolution plot.
     This shows how accurate the reconstructed evolution is.
     """
     physical_parameters = actual.loc[:, DatasetConfig.physical_parameters]
@@ -157,11 +148,9 @@ def scatter_abundances_vs_physical_parameters(
     species_of_interest: list,
     output_folder: str = "plots/compare_scatter_abundances",
 ):
-    """
-    Generates comparative scatter plots of training vs. predicted abundances
+    """Generates comparative scatter plots of training vs. predicted abundances
     for each species vs. each physical parameter.
     """
-
     combined_df = pd.concat([training_df, inference_df], ignore_index=True)
     global_mins = np.log10(combined_df[DatasetConfig.physical_parameters].min())
     global_maxs = np.log10(combined_df[DatasetConfig.physical_parameters].max())
@@ -290,9 +279,7 @@ def plot_error_vs_time(
     label: str = "Mean MRE across species",
     save_path: str = "plots/errors/unnamed.png",
 ):
-    """
-    Helper function for plotting errors across time.
-    """
+    """Helper function for plotting errors across time."""
     save_path = os.path.join(DatasetConfig.working_path, save_path)
 
     errors = errors.cpu().numpy()
@@ -325,8 +312,7 @@ def calculate_relative_error(feature, target):
 
 @torch.jit.script
 def calculate_conservation_error(tensor1: torch.Tensor, tensor2: torch.Tensor):
-    """
-    returns
+    """returns:
     mean_original_elemental_abundances, mean_reconstruction_elemental_abundances, conservation_error
 
     """
@@ -345,9 +331,7 @@ def calculate_mace_error(
     max_abundance: torch.Tensor = PredefinedTensors.mace_max_abundance,  # Maximum abundance defined in MACE github.
     mace_factor: float = PredefinedTensors.mace_factor,  # MACE has 468 species and we have 335, so we multiply by 468/335.
 ):
-    """
-    Calculate the MACE error as defined in the MACE github repository.
-    """
+    """Calculate the MACE error as defined in the MACE github repository."""
     original_clipped = torch.clamp(original_abundances, min=0.0, max=max_abundance)
     reconstructed_clipped = torch.clamp(
         reconstructed_abundances, min=0.0, max=max_abundance

@@ -11,6 +11,7 @@ from nn_architectures.emulator import Emulator, load_emulator
 
 
 def main():
+    print(GeneralConfig.device)
     processing_functions = dp.Processing(
         GeneralConfig,
         AEConfig,

@@ -12,6 +12,15 @@ from torch.backends import cudnn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
+import src.AstroChemNet.data_processing as dp
+from configs.autoencoder import AEConfig
+from configs.emulator import EMConfig
+from configs.general import GeneralConfig
+from nn_architectures.autoencoder import Autoencoder
+from nn_architectures.emulator import Emulator
+from src.AstroChemNet.inference import Inference
+from src.AstroChemNet.loss import Loss
+
 cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -21,17 +30,15 @@ torch.autograd.set_detect_anomaly(True)
 class Trainer:
     def __init__(
         self,
-        GeneralConfig,
-        model_config,
-        model: torch.nn.Module,
+        GeneralConfig: GeneralConfig,
+        model_config: AEConfig | EMConfig,
+        model: Autoencoder | Emulator,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """
-        Initializes the Trainer class. A class which simplifies training by including all necessary components.
-        """
+        """Initializes the Trainer class. A class which simplifies training by including all necessary components."""
         self.device = GeneralConfig.device
         self.start_time = datetime.now()
         self.model_config = model_config
@@ -54,52 +61,42 @@ class Trainer:
         self.loss_per_epoch = []
 
     def save_loss_per_epoch(self):
-        """
-        Saves the loss per epoch to a file.
-        """
+        """Saves the loss per epoch to a file."""
         epochs_path = os.path.splitext(self.model_config.save_model_path)[0] + ".json"
         with open(epochs_path, "w") as f:
             json.dump(self.loss_per_epoch, f, indent=4)
 
     def print_final_time(self):
-        """
-        Prints the total training time.
-        """
+        """Prints the total training time."""
         end_time = datetime.now()
         total_time = end_time - self.start_time
         print(f"Total Training Time: {total_time}")
         print(f"Total Epochs: {len(self.loss_per_epoch)}")
 
     def _save_checkpoint(self):
-        """
-        Saves the model's state dictionary to a file.
-        """
+        """Saves the model's state dictionary to a file."""
         checkpoint = self.model.state_dict()
         model_path = os.path.join(self.model_config.save_model_path)
         if self.model_config.save_model:
             torch.save(checkpoint, model_path)
 
     def set_dropout_rate(self, dropout_rate):
-        """
-        Sets the dropout rate for all dropout layers in the model.
-        """
+        """Sets the dropout rate for all dropout layers in the model."""
         for module in self.model.modules():
             if isinstance(module, torch.nn.Dropout):
                 module.p = dropout_rate
         self.current_dropout_rate = dropout_rate
 
     def _check_early_stopping(self):
-        """
-        Ends training once the number of stagnant epochs exceeds the patience.
-        """
+        """Ends training once the number of stagnant epochs exceeds the patience."""
         if self.stagnant_epochs >= self.model_config.stagnant_epoch_patience:
             print("Ending training early due to stagnant epochs.")
             return True
         return False
 
     def _check_minimum_loss(self):
-        """
-        Checks if the current epoch's validation loss is the minimum loss so far.
+        """Checks if the current epoch's validation loss is the minimum loss so far.
+
         Calculates the mean relative error and the std of the species-wise mean relative error.
         Uses a metric for the minimum loss which gives weight to the mean and std relative errors.
         Includes a scheduler to reduce the learning rate once the minimum loss stagnates.
@@ -173,9 +170,7 @@ class Trainer:
         return NotImplementedError("This method should be implemented in subclasses.")
 
     def train(self):
-        """
-        Training loop for the autoencoder. Runs until the minimum loss stagnates for a number of epochs.
-        """
+        """Training loop for the autoencoder. Runs until the minimum loss stagnates for a number of epochs."""
         gc.collect()
         if self.device == "cuda":
             torch.cuda.empty_cache()
@@ -198,18 +193,16 @@ class Trainer:
 class AutoencoderTrainer(Trainer):
     def __init__(
         self,
-        GeneralConfig,
-        AEConfig,
-        loss_functions,
-        autoencoder: torch.nn.Module,
+        GeneralConfig: GeneralConfig,
+        AEConfig: AEConfig,
+        loss_functions: Loss,
+        autoencoder: Autoencoder,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """
-        Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder.
-        """
+        """Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder."""
         self.num_metadata = GeneralConfig.num_metadata
         self.num_phys = GeneralConfig.phys
         self.num_species = GeneralConfig.num_species
@@ -231,9 +224,7 @@ class AutoencoderTrainer(Trainer):
         )
 
     def _run_training_batch(self, features):
-        """
-        Runs a training batch where features = targets since this is an autoencoder.
-        """
+        """Runs a training batch where features = targets since this is an autoencoder."""
         self.optimizer.zero_grad()
         outputs = self.model(features)
         loss = self.training_loss(
@@ -245,10 +236,8 @@ class AutoencoderTrainer(Trainer):
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
 
-    def _run_validation_batch(self, features):
-        """
-        Runs a validation batch where features = targets since this is an autoencoder.
-        """
+    def _run_validation_batch(self, features: torch.Tensor):
+        """Runs a validation batch where features = targets since this is an autoencoder."""
         component_outputs = self.model.encode(features)
         outputs = self.model.decode(component_outputs)
 
@@ -256,9 +245,7 @@ class AutoencoderTrainer(Trainer):
         self.epoch_validation_loss += loss
 
     def _run_epoch(self, epoch):
-        """
-        Since this is an autoencoder, there are no targets and thus the dataloaderss only have features.
-        """
+        """Since this is an autoencoder, there are no targets and thus the dataloaderss only have features."""
         self.training_dataloader.sampler.set_epoch(epoch)
 
         tic1 = datetime.now()
@@ -282,20 +269,18 @@ class EmulatorTrainerSequential(Trainer):
     def __init__(
         self,
         GeneralConfig,
-        AEConfig,
-        EMConfig,
-        loss_functions,
-        processing_functions,
-        autoencoder: torch.nn.Module,
-        emulator: torch.nn.Module,
+        AEConfig: AEConfig,
+        EMConfig: EMConfig,
+        loss_functions: Loss,
+        processing_functions: dp.Processing,
+        autoencoder: Autoencoder,
+        emulator: Emulator,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """
-        Initializes the EmulatorTrainer, a subclass of Trainer, specialized for train the emulator.
-        """
+        """Initializes the EmulatorTrainer, a subclass of Trainer, specialized for train the emulator."""
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
@@ -316,9 +301,7 @@ class EmulatorTrainerSequential(Trainer):
         )
 
     def _run_training_batch(self, phys, features, targets):
-        """
-        Runs a single training batch.
-        """
+        """Runs a single training batch."""
         self.optimizer.zero_grad()
 
         outputs = self.model(phys, features)
@@ -334,25 +317,20 @@ class EmulatorTrainerSequential(Trainer):
         self.optimizer.step()
 
     def _run_validation_batch(self, phys, features, targets):
-        """
-        Runs a single validation batch.
-        """
-
+        """Runs a single validation batch."""
         outputs = self.model(phys, features)
 
         outputs = outputs.reshape(-1, self.latent_dim)
         outputs = self.inverse_latent_components_scaling(outputs)
         outputs = self.ae.decode(outputs)
-        targets = targets.reshape(-1, 333)
+        outputs = outputs.reshape(targets.size(0), targets.size(1), -1)
 
         loss = self.validation_loss(outputs, targets).mean(dim=0)
 
         self.epoch_validation_loss += loss.detach()
 
     def _run_epoch(self, epoch):
-        """
-        Runs a single epoch of training and validation, profiling the first 10 training batches.
-        """
+        """Runs a single epoch of training and validation, profiling the first 10 training batches."""
         self.training_dataloader.sampler.set_epoch(epoch)
         tic1 = datetime.now()
 

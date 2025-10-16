@@ -18,16 +18,16 @@
   "ruff.organizeImports": true,
 
   // --- Python environment ---
-  "python.defaultInterpreterPath": ".venv/bin/python", // or full path to your virtualenv
+  "python.defaultInterpreterPath": ".venv/bin/python",
   "python.envFile": "${workspaceFolder}/.env",
 
   // --- Working directory setup ---
   "terminal.integrated.cwd": "${workspaceFolder}",
   "python.testing.cwd": "${workspaceFolder}",
-  "python.analysis.extraPaths": ["."]
+  "python.analysis.extraPaths": [ "." ],
 
   // --- Ensure PYTHONPATH points to project root ---
-  ,"terminal.integrated.env.windows": {
+  "terminal.integrated.env.windows": {
     "PYTHONPATH": "${workspaceFolder}"
   },
   "terminal.integrated.env.linux": {
@@ -36,17 +36,24 @@
   "terminal.integrated.env.osx": {
     "PYTHONPATH": "${workspaceFolder}"
   },
-    // --- Editor UX ---
+
+  // --- Editor UX ---
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "editor.tabSize": 4,
-  "editor.rulers": [], // matches Ruff’s line length
+  "editor.rulers": [],
   "editor.wordWrap": "on",
-  "editor.minimap.enabled": false,
   "workbench.editor.enablePreview": false,
 
+  // ✅ Enable the overview ruler & minimap markers
+  "editor.minimap.enabled": true,
+  "editor.overviewRulerBorder": true,
+  "editor.overviewRulerLanes": 3,
+  "problems.decorations.enabled": true,
+  "problems.autoReveal": true,
+
   // --- Python & Jupyter ---
-  "python.analysis.typeCheckingMode": "basic", // or "strict" for advanced checking
+  "python.analysis.typeCheckingMode": "basic",
   "python.analysis.autoImportCompletions": true,
   "jupyter.askForKernelRestart": false,
   "jupyter.notebookFileRoot": "${workspaceFolder}",
@@ -65,7 +72,11 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit"
   },
+
+  // --- Environment activation ---
   "python.terminal.activateEnvironment": true,
+
+  // --- Docstring helper ---
   "autoDocstring.docstringFormat": "google",
   "autoDocstring.generateDocstringOnEnter": true,
   "autoDocstring.startOnNewLine": true,

@@ -35,14 +35,14 @@ class Autoencoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.noise = noise
 
-    def encode(self, x):
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
         x = self.activation(self.encoder_bn1(self.encoder_fc1(x)))
         x = self.activation(self.encoder_bn2(self.encoder_fc2(x)))
         x = self.dropout(x)
         z = self.activation(self.encoder_norm3(self.encoder_fc3(x)))
         return z
 
-    def decode(self, z):
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
         z = F.linear(z, self.encoder_fc3.weight.t()) + self.decoder_bias1
         z = self.activation(self.decoder_bn1(z))
 
@@ -54,7 +54,7 @@ class Autoencoder(nn.Module):
         x_reconstructed = self.final_activation(x_reconstructed)
         return x_reconstructed
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         z = self.encode(x)
         if self.training and self.noise > 0:
             noise = torch.randn_like(z) * self.noise

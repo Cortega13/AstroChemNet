@@ -47,9 +47,7 @@ def rename_columns(columns):
 def convertUCLCHEMbaseAvtoAv(
     physical_parameters: np.array,
 ):
-    """
-    This conversion is used internally in UCLCHEM. Our dataset has Av, although the dataset was generated using baseAv.
-    """
+    """This conversion is used internally in UCLCHEM. Our dataset has Av, although the dataset was generated using baseAv."""
     baseAv_idx = 2
     density_idx = 0
     multiplier = 0.0000964375
@@ -62,9 +60,7 @@ def convertUCLCHEMbaseAvtoAv(
 
 
 def reconstruct_emulated_outputs(encoded_inputs, emulated_outputs):
-    """
-    Adds the time and physical parameter columns to the latent components.
-    """
+    """Adds the time and physical parameter columns to the latent components."""
     num_physical_parameters = DatasetConfig.num_physical_parameters
     reconstructed_emulated_outputs = torch.cat(
         (encoded_inputs[:, : 1 + num_physical_parameters], emulated_outputs), dim=1

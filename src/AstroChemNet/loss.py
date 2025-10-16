@@ -44,9 +44,7 @@ class Loss:
         tensor1: torch.Tensor,
         tensor2: torch.Tensor,
     ):
-        """
-        Given the actual and predicted abundances, this function calculates a loss between the elemental abundances of both.
-        """
+        """Given the actual and predicted abundances, this function calculates a loss between the elemental abundances of both."""
         unscaled_tensor1 = self.inverse_abundances_scaling(tensor1)
         unscaled_tensor2 = self.inverse_abundances_scaling(tensor2)
 
@@ -70,12 +68,10 @@ class Loss:
         targets: torch.Tensor,
         alpha: float = 2,
     ):
-        """
-        This is the custom loss function for the autoencoder.
+        """This is the custom loss function for the autoencoder.
         It's a combination of the reconstruction loss, conservation loss,
         and a penalty on the worst-performing species.
         """
-
         mean_loss, worst_loss = self.elementwise_loss(
             outputs, targets, self.exponential, self.power_weight
         )
@@ -94,9 +90,7 @@ class Loss:
         return total_loss
 
     def validation(self, outputs, targets):
-        """
-        This is the custom loss function for the autoencoder. It's a combination of the reconstruction loss and the conservation loss.
-        """
+        """This is the custom loss function for the autoencoder. It's a combination of the reconstruction loss and the conservation loss."""
         unscaled_outputs = self.inverse_abundances_scaling(outputs)
         unscaled_targets = self.inverse_abundances_scaling(targets)
 
