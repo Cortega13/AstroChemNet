@@ -1,3 +1,11 @@
+"""Saves t-SNE data for physical parameters sequences.
+
+- Loads training and validation datasets
+- Extracts physical parameters for each unique model
+- Applies PCA and t-SNE to reduce dimensionality
+- Saves the results to 'phys_tsne_data.csv' with columns: tracer_index, tsne1, tsne2, log_density
+"""
+
 import os
 import sys
 
@@ -21,23 +29,26 @@ unique_models = np.unique(combined_np[:, 1])
 
 selected_models = unique_models  # Use all tracers
 
-tracer_species = []
+tracer_phys = []
 tracer_log_densities = []
 
 for model in selected_models:
     mask = combined_np[:, 1] == model
     subset = combined_np[mask]
-    species_data = subset[:, -GeneralConfig.num_species :].copy()
-    log_species = np.log10(species_data + 1e-20)
-    tracer_species.append(log_species.flatten())
-    final_density = subset[-1, GeneralConfig.num_metadata]
+    phys_data = subset[
+        :,
+        GeneralConfig.num_metadata : GeneralConfig.num_metadata
+        + GeneralConfig.num_phys,
+    ].copy()
+    tracer_phys.append(phys_data.flatten())
+    final_density = subset[-1, GeneralConfig.num_metadata]  # Final density (phys[0])
     tracer_log_densities.append(np.log10(final_density))
 
-species_data = np.array(tracer_species)
+phys_data = np.array(tracer_phys)
 
 # PCA
 pca = PCA(n_components=50)
-pca_reduced = pca.fit_transform(species_data)
+pca_reduced = pca.fit_transform(phys_data)
 
 # t-SNE
 tsne = TSNE(n_components=2, random_state=42, perplexity=100)
@@ -48,11 +59,11 @@ data = np.column_stack(
     (unique_models, embedded[:, 0], embedded[:, 1], tracer_log_densities)
 )
 np.savetxt(
-    "tsne_data.csv",
+    "phys_tsne_data.csv",
     data,
     delimiter=",",
     header="tracer_index,tsne1,tsne2,log_density",
     comments="",
 )
 
-print("Data saved to tsne_data.csv")
+print("Data saved to phys_tsne_data.csv")

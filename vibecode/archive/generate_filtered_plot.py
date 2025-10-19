@@ -1,3 +1,11 @@
+"""Generates a filtered t-SNE plot of species trajectories.
+
+- Loads t-SNE data from 'tsne_data.csv'
+- Applies filters to exclude tracers in a specific strip and those with low log density
+- Creates a scatter plot colored by log density
+- Saves the plot to '../plots/trajectories/pca_tsne_species_filtered.png'
+"""
+
 import os
 
 import matplotlib.pyplot as plt

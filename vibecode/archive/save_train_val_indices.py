@@ -1,3 +1,13 @@
+"""Saves training and validation indices based on t-SNE data filters.
+
+- Loads t-SNE data from 'tsne_data.csv'
+- Defines strips to exclude certain regions
+- Filters tracers based on log density >= 6.7
+- Assigns training indices to high density tracers not in strips
+- Assigns validation indices to high density tracers in strips
+- Saves indices to 'train_indices.csv' and 'val_indices.csv'
+"""
+
 import numpy as np
 
 # Load the saved data

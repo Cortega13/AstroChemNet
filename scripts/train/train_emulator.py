@@ -36,46 +36,46 @@ def main():
         GeneralConfig, validation_dataset, category="validation_seq"
     )
 
-    training_dataset, training_indices = dl.load_tensors_from_hdf5(
-        GeneralConfig, category="training_seq"
-    )
-    validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
-        GeneralConfig, category="validation_seq"
-    )
+    # training_dataset, training_indices = dl.load_tensors_from_hdf5(
+    #     GeneralConfig, category="training_seq"
+    # )
+    # validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
+    #     GeneralConfig, category="validation_seq"
+    # )
 
-    training_Dataset = dl.EmulatorSequenceDataset(
-        GeneralConfig, AEConfig, training_dataset, training_indices
-    )
-    validation_Dataset = dl.EmulatorSequenceDataset(
-        GeneralConfig, AEConfig, validation_dataset, validation_indices
-    )
-    del training_dataset, validation_dataset, training_indices, validation_indices
+    # training_Dataset = dl.EmulatorSequenceDataset(
+    #     GeneralConfig, AEConfig, training_dataset, training_indices
+    # )
+    # validation_Dataset = dl.EmulatorSequenceDataset(
+    #     GeneralConfig, AEConfig, validation_dataset, validation_indices
+    # )
+    # del training_dataset, validation_dataset, training_indices, validation_indices
 
-    training_dataloader = dl.tensor_to_dataloader(EMConfig, training_Dataset)
-    validation_dataloader = dl.tensor_to_dataloader(EMConfig, validation_Dataset)
+    # training_dataloader = dl.tensor_to_dataloader(EMConfig, training_Dataset)
+    # validation_dataloader = dl.tensor_to_dataloader(EMConfig, validation_Dataset)
 
-    emulator = load_emulator(Emulator, GeneralConfig, EMConfig)
-    optimizer, scheduler = load_objects(emulator, EMConfig)
+    # emulator = load_emulator(Emulator, GeneralConfig, EMConfig)
+    # optimizer, scheduler = load_objects(emulator, EMConfig)
 
-    loss_functions = Loss(
-        processing_functions,
-        GeneralConfig,
-        ModelConfig=EMConfig,
-    )
-    emulator_trainer = EmulatorTrainerSequential(
-        GeneralConfig,
-        AEConfig,
-        EMConfig,
-        loss_functions,
-        processing_functions,
-        autoencoder,
-        emulator,
-        optimizer,
-        scheduler,
-        training_dataloader,
-        validation_dataloader,
-    )
-    emulator_trainer.train()
+    # loss_functions = Loss(
+    #     processing_functions,
+    #     GeneralConfig,
+    #     ModelConfig=EMConfig,
+    # )
+    # emulator_trainer = EmulatorTrainerSequential(
+    #     GeneralConfig,
+    #     AEConfig,
+    #     EMConfig,
+    #     loss_functions,
+    #     processing_functions,
+    #     autoencoder,
+    #     emulator,
+    #     optimizer,
+    #     scheduler,
+    #     training_dataloader,
+    #     validation_dataloader,
+    # )
+    # emulator_trainer.train()
 
 
 if __name__ == "__main__":

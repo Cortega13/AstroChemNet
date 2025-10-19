@@ -1,3 +1,13 @@
+"""Generates a t-SNE comparison plot for training, validation ground truth, and predicted trajectories.
+
+- Loads models and data for validation
+- Predicts trajectories starting from timestep 65 using the emulator
+- Applies PCA and t-SNE to combined training, validation GT, and predicted data
+- Creates an overlay plot with different colors for each group
+- Calculates and prints mean percentage error for predictions
+- Saves the plot to '../plots/trajectories/tsne_training_val_pred_overlay_fitted.png'
+"""
+
 import os
 import sys
 
@@ -81,20 +91,24 @@ for model in unique_models:
     final_density = model_data[-1, 3]
     log_densities.append(np.log10(final_density))
 
-    # Predict sequence
-    initial_abundances = model_data[0, abundances_cols]
+    # Predict sequence starting from timestep 65 (index 64) with ground truth up to that point
+    start_timestep = 64  # 0-indexed, so timestep 65
+
+    # Use ground truth up to start_timestep
+    predicted_abundances = list(model_data[:start_timestep, abundances_cols])
+
+    # Start prediction from the latents at start_timestep
+    latents = inference.encode(
+        model_data[start_timestep, abundances_cols].reshape(1, -1)
+    ).squeeze()
+
     phys_params = model_data[:, num_metadata : num_metadata + num_phys]
 
     # Scale phys params
     phys_scaled = phys_params.copy()
     processing.physical_parameter_scaling(phys_scaled)
 
-    # Start with initial latents
-    latents = inference.encode(initial_abundances.reshape(1, -1)).squeeze()
-
-    predicted_abundances = [initial_abundances]
-
-    for t in range(1, len(model_data)):
+    for t in range(start_timestep, len(model_data)):
         phys_t = phys_scaled[t].reshape(1, 1, -1)  # Add time dimension
         next_latents = inference.latent_emulate(
             phys_t, latents.reshape(1, -1)
@@ -132,7 +146,7 @@ training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
 
 # Get training trajectories
 train_trajectories = []
-for idx in train_indices[:100]:  # Limit to first 100 for speed
+for idx in train_indices[:200]:  # Increase to 200 for better representation
     model_mask = training_np[:, 1] == idx
     model_data = training_np[model_mask]
     if len(model_data) > 0:
@@ -143,7 +157,7 @@ for idx in train_indices[:100]:  # Limit to first 100 for speed
 
 # Get validation GT trajectories
 val_gt_trajectories = []
-for idx in val_indices[:50]:  # Limit to first 50 for speed
+for idx in val_indices[:100]:  # Increase to 100 for better representation
     model_mask = validation_np[:, 1] == idx
     model_data = validation_np[model_mask]
     if len(model_data) > 0:
@@ -151,6 +165,10 @@ for idx in val_indices[:50]:  # Limit to first 50 for speed
         abundances = model_data[:, -general_config.num_species :]
         log_abund = np.log10(abundances + 1e-20).flatten()
         val_gt_trajectories.append(log_abund)
+
+print(f"Training trajectories: {len(train_trajectories)}")
+print(f"Validation GT trajectories: {len(val_gt_trajectories)}")
+print(f"Predicted trajectories: {len(predicted_trajectories)}")
 
 # Fit PCA and t-SNE on training + validation GT + predicted (combined)
 combined_fit_data = np.vstack(
@@ -231,5 +249,43 @@ plt.savefig(
     bbox_inches="tight",
 )
 plt.close()
+
+# Calculate mean percentage error for validation predictions
+errors = []
+for i, model in enumerate(unique_models):
+    if i < len(predicted_trajectories):
+        pred_seq = np.array(predicted_trajectories[i])
+        # Get corresponding GT sequence
+        model_mask = validation_filtered[:, 1] == model
+        model_data = validation_filtered[model_mask]
+        model_data = model_data[np.argsort(model_data[:, 2])]
+        gt_seq = model_data[:, abundances_cols]
+
+        # Only compare from timestep 65 onward
+        start_timestep = 64
+        if len(pred_seq) > start_timestep and len(gt_seq) > start_timestep:
+            pred_later = pred_seq[start_timestep:]
+            gt_later = gt_seq[start_timestep:]
+
+            # Flatten both to ensure same shape
+            pred_flat = pred_later.flatten()
+            gt_flat = gt_later.flatten()
+
+            # Ensure same length
+            min_len = min(len(pred_flat), len(gt_flat))
+            pred_flat = pred_flat[:min_len]
+            gt_flat = gt_flat[:min_len]
+
+            # Calculate percentage error
+            abs_error = np.abs(pred_flat - gt_flat)
+            percentage_error = (abs_error / (np.abs(gt_flat) + 1e-20)) * 100
+            mean_error = np.mean(percentage_error)
+            errors.append(mean_error)
+
+if errors:
+    mean_percentage_error = np.mean(errors)
+    print(".2f")
+else:
+    print("No errors calculated")
 
 print("Validation t-SNE comparison generated.")

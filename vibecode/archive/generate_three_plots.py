@@ -1,3 +1,12 @@
+"""Generates three t-SNE plots of flattened species trajectories with different filters.
+
+- Loads t-SNE data from 'tsne_data.csv'
+- Defines strips to exclude certain regions
+- Generates three plots: all tracers, high density tracers, and high density excluding strips
+- Prints statistics on tracer counts
+- Saves plots to '../plots/trajectories/' directory
+"""
+
 import os
 
 import matplotlib.pyplot as plt

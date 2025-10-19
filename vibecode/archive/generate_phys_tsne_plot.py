@@ -1,3 +1,10 @@
+"""Generates a t-SNE plot of physical parameters sequences.
+
+- Loads t-SNE data from 'vibecode/phys_tsne_data.csv'
+- Creates a scatter plot colored by log density
+- Saves the plot to 'plots/trajectories/phys_pca_tsne.png'
+"""
+
 import os
 
 import matplotlib.pyplot as plt

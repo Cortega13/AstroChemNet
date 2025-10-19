@@ -11,7 +11,7 @@ class EMConfig:
     # Model
     input_dim = GeneralConfig.num_phys + AEConfig.latent_dim
     output_dim = AEConfig.latent_dim
-    hidden_dim = 256
+    hidden_dim = 180
     window_size = 240
 
     # Hyperparameters
