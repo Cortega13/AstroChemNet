@@ -8,3 +8,7 @@ grid_folder/
 __pycache__/
 
 .ruff_cache/
+
+*.h5
+*.npy
+*.csv
