@@ -189,6 +189,39 @@ def generate_plot(tsne1, tsne2, training_mask, validation_mask, plots_dir):
     print("Barebones training vs validation t-SNE plot generated.")
 
 
+def save_indices(data, training_mask, validation_mask):
+    """Save training and validation indices to CSV files."""
+    tracer_indices = data[:, 0].astype(int)
+
+    training_indices = tracer_indices[training_mask]
+    validation_indices = tracer_indices[validation_mask]
+
+    np.savetxt(
+        "training_indices.csv",
+        training_indices,
+        delimiter=",",
+        header="tracer_index",
+        comments="",
+        fmt="%d",
+    )
+
+    np.savetxt(
+        "validation_indices.csv",
+        validation_indices,
+        delimiter=",",
+        header="tracer_index",
+        comments="",
+        fmt="%d",
+    )
+
+    print(
+        f"Training indices saved to training_indices.csv ({len(training_indices)} tracers)"
+    )
+    print(
+        f"Validation indices saved to validation_indices.csv ({len(validation_indices)} tracers)"
+    )
+
+
 def main():
     """Main function to orchestrate the t-SNE plot generation."""
     # Paths (adjust if needed)
@@ -213,6 +246,9 @@ def main():
 
     # Print statistics
     print_statistics(tsne1, high_density_mask, training_mask, validation_mask)
+
+    # Save indices
+    save_indices(data, training_mask, validation_mask)
 
     # Generate plot
     generate_plot(tsne1, tsne2, training_mask, validation_mask, plots_dir)

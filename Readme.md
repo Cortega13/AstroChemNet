@@ -5,31 +5,36 @@ This package contains training/testing procedures for training deep neural netwo
 
 ## Project Structure
 ```
-project-name/
-├── configs/                    # Includes config files containing dataset/model information.
-├── data/                       # Include your .h5 datasets here for training/testing/inference.
-├── nn_architectures/           # Contains neural network architectures in pytorch nn.Module format.
-├── plots/                      # Plots generated from scripts/analysis/
-├── research/                   # Similar research avenues which were explored.
-├── scripts/                    # Contains all scripts.
-│   └── preprocessing/          # Notebooks for preprocessing dataset before usage.
-│   └── analysis/               # Notebooks for analyzing trained models.
-│   └── train/                  # Scripts for training different models.
-├── src/                        # Source code
-│   └── AstroChemNet/           # Main package
-│       ├── analysis.py/        # Functions for analyzing model testing/inference and producing plots.
-│       ├── data_loading.py/    # Functions for loading data onto cpu and loading efficiently into trainer.
-│       ├── data_processing.py/ # Functions for preprocessing/postprocessing.
-│       ├── inference.py/       # Functions for inferencing models. 
-│       ├── loss.py/            # Loss Functions for training.
-│       ├── trainer.py/         # Main training function following common training procedures.
-│       └── utils.py/           # Less common functions used in preprocessing/analysis.
-├── utils/                      # Saved useful commonly used arrays.
-├── weights/                    # Contains model weights during/after training.
-├── .gitignore                  # What to ignore by git.
-└── README.md                   # Project documentation
-├── pyproject.toml              # Project configuration
-└── requirements.txt            # Python Packages needed for this package.
+AstroChemNet/
+├── configs/                    # Training and evaluation configuration objects.
+├── data/                       # Drop-in location for local .h5 datasets.
+├── nn_architectures/           # PyTorch module definitions for the surrogate models.
+├── plots/
+│   ├── assets/                 # Static images used across documentation/notebooks.
+│   └── trajectories/           # Generated trajectory visualisations.
+├── research/                   # Exploratory notebooks testing alternative approaches.
+├── scripts/
+│   ├── analysis/               # Notebooks for post-training investigation.
+│   ├── preprocessing/          # Data-prep notebooks and utilities.
+│   └── train/                  # CLI entry points and helpers for training jobs.
+├── src/
+│   └── AstroChemNet/           # Installable package code.
+│       ├── analysis.py         # Plotting and metrics helpers.
+│       ├── data_loading.py     # Dataset loaders and batching helpers.
+│       ├── data_processing.py  # Pre-/post-processing utilities.
+│       ├── inference.py        # Inference pipelines.
+│       ├── loss.py             # Loss definitions used during training.
+│       ├── trainer.py          # High-level training loop.
+│       └── utils.py            # Shared helper functions.
+├── utils/                      # Cached numpy arrays and lookup tables.
+├── vibecode/                   # ViBe baseline experiments and scripts.
+│   └── archive/                # Historical utilities for ViBe experiments.
+├── weights/
+│   └── archived_original/      # Reference checkpoints and experiment artefacts.
+├── .gitignore                  # Git ignore rules.
+├── README.md                   # Project documentation (this file).
+├── pyproject.toml              # Project configuration for packaging.
+└── requirements.txt            # Python dependency lockfile for development.
 ```
 ## Setup Guide
 Clone the repository.

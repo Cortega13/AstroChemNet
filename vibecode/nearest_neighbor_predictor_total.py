@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 
 
 def load_datasets():
-    """Load combined training and validation datasets."""
+    """Load training and validation datasets."""
     sys.path.append(os.path.abspath(".."))
     import AstroChemNet.data_loading as dl
     from configs.emulator import EMConfig
@@ -25,19 +25,7 @@ def load_datasets():
     em_config = EMConfig()
 
     training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
-    data_np = np.concatenate([training_np, validation_np], axis=0)
-    return data_np, general_config
-
-
-def load_indices():
-    """Load training and validation indices from CSV files."""
-    training_indices = np.loadtxt(
-        "training_indices.csv", delimiter=",", skiprows=1, dtype=int
-    )
-    validation_indices = np.loadtxt(
-        "validation_indices.csv", delimiter=",", skiprows=1, dtype=int
-    )
-    return training_indices, validation_indices
+    return training_np, validation_np, general_config
 
 
 def extract_trajectories_by_model(dataset, general_config):
@@ -45,53 +33,74 @@ def extract_trajectories_by_model(dataset, general_config):
     unique_models = np.unique(dataset[:, 1])
     model_trajectories = {}
     model_log_trajectories = {}
+    model_phys_trajectories = {}
+    model_log_phys_trajectories = {}
+    model_log_densities = {}
 
     for model in unique_models:
         mask = dataset[:, 1] == model
         subset = dataset[mask]
 
         data = subset[:, -general_config.num_species :].copy()
+        phys_data = subset[
+            :,
+            general_config.num_metadata : general_config.num_metadata
+            + general_config.num_phys,
+        ].copy()
         model_trajectories[model] = data
         model_log_trajectories[model] = np.log10(data + 1e-20)
+        model_phys_trajectories[model] = phys_data
+        model_log_phys_trajectories[model] = np.log10(phys_data + 1e-20)
 
-    return model_trajectories, model_log_trajectories
+        final_density = subset[-1, general_config.num_metadata]
+        model_log_densities[model] = np.log10(final_density + 1e-20)
+
+    return (
+        model_trajectories,
+        model_log_trajectories,
+        model_log_phys_trajectories,
+        model_log_densities,
+    )
 
 
-def build_training_vector_database(training_log_trajectories, training_indices):
+def build_training_vector_database(
+    training_log_phys_trajectories, training_log_trajectories, training_log_densities
+):
     """Build vector database from training data using PCA."""
     training_data = []
     training_sequences = {}
     model_list = []
 
-    for model in training_indices:
-        trajectory = training_log_trajectories[model]
+    for model in training_log_phys_trajectories.keys():
+        trajectory = training_log_phys_trajectories[model]
         flattened = trajectory.flatten()
         training_data.append(flattened)
-        training_sequences[model] = trajectory
+        training_sequences[model] = training_log_trajectories[model]
         model_list.append(model)
 
     training_data = np.array(training_data)
 
-    if len(training_data) == 0:
-        raise ValueError("No training models found.")
-
     pca = PCA(n_components=50)
     training_pca = pca.fit_transform(training_data)
 
-    print(f"Training vector database built with {len(training_indices)} models")
+    print(
+        f"Training vector database built with {len(training_log_phys_trajectories)} models"
+    )
     print(f"Original training data shape: {training_data.shape}")
     print(f"PCA reduced shape: {training_pca.shape}")
 
     return training_pca, training_sequences, model_list, pca
 
 
-def build_validation_vectors(validation_log_trajectories, validation_indices, pca):
+def build_validation_vectors(
+    validation_log_phys_trajectories, validation_log_densities, pca
+):
     """Build validation vectors using the same PCA transform."""
     validation_data = []
     validation_sequences = {}
 
-    for model in validation_indices:
-        trajectory = validation_log_trajectories[model]
+    for model in validation_log_phys_trajectories.keys():
+        trajectory = validation_log_phys_trajectories[model]
         flattened = trajectory.flatten()
         validation_data.append(flattened)
         validation_sequences[model] = trajectory
@@ -100,7 +109,9 @@ def build_validation_vectors(validation_log_trajectories, validation_indices, pc
 
     validation_pca = pca.transform(validation_data)
 
-    print(f"Validation vectors built with {len(validation_indices)} models")
+    print(
+        f"Validation vectors built with {len(validation_log_phys_trajectories)} models"
+    )
     print(f"Original validation data shape: {validation_data.shape}")
     print(f"PCA reduced shape: {validation_pca.shape}")
 
@@ -215,19 +226,29 @@ def main():
     """Main function to run the nearest neighbor prediction pipeline."""
     print("Starting Nearest Neighbor Prediction Pipeline...")
 
-    data_np, general_config = load_datasets()
-    training_indices, validation_indices = load_indices()
+    training_np, validation_np, general_config = load_datasets()
 
-    trajectories, log_trajectories = extract_trajectories_by_model(
-        data_np, general_config
-    )
+    (
+        training_trajectories,
+        training_log_trajectories,
+        training_log_phys_trajectories,
+        training_log_densities,
+    ) = extract_trajectories_by_model(training_np, general_config)
+    (
+        validation_trajectories,
+        validation_log_trajectories,
+        validation_log_phys_trajectories,
+        validation_log_densities,
+    ) = extract_trajectories_by_model(validation_np, general_config)
 
     training_pca, training_sequences, model_list, pca = build_training_vector_database(
-        log_trajectories, training_indices
+        training_log_phys_trajectories,
+        training_log_trajectories,
+        training_log_densities,
     )
 
     validation_pca, validation_sequences = build_validation_vectors(
-        log_trajectories, validation_indices, pca
+        validation_log_phys_trajectories, validation_log_densities, pca
     )
 
     predictions, nearest_neighbors = predict_with_nearest_neighbors(
@@ -242,7 +263,7 @@ def main():
     lin_predictions = {
         m: np.maximum(10**pred - 1e-20, 0.0) for m, pred in predictions.items()
     }
-    mape_scores = calculate_mape(lin_predictions, trajectories)
+    mape_scores = calculate_mape(lin_predictions, validation_trajectories)
 
     print_prediction_statistics(mape_scores, nearest_neighbors)
 
