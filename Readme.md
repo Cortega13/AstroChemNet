@@ -1,7 +1,7 @@
 ### Note: This package is currently under development. Any and all suggestions for improvements are welcome.
 
 ## Surrogate Modeling for Astrochemical Networks.
-This package contains training/testing procedures for training deep neural network surrogate models for astrochemical networks. We use the [UCLCHEM](https://github.com/uclchem/UCLCHEM) chemical network for our datasets. Datasets are available upon request. 
+This package contains training/testing procedures for training deep neural network surrogate models for astrochemical networks. We use the [UCLCHEM](https://github.com/uclchem/UCLCHEM) chemical network for our datasets. Datasets are available upon request.
 
 ## Project Structure
 ```
@@ -55,38 +55,161 @@ Install the package using pip. Note: No necessary package dependencies are defin
 pip install -e .
 ```
 
+## Configuration System
+
+AstroChemNet uses [Hydra](https://hydra.cc/) for hierarchical configuration management, allowing flexible training setups with YAML files and CLI overrides.
+
+### Configuration Structure
+
+```
+configs/
+├── config.yaml              # Autoencoder training config
+├── config_emulator.yaml     # Emulator training config
+├── preprocess.yaml          # Data preprocessing config
+├── datasets/
+│   └── grav.yaml           # Dataset paths and physical parameters
+└── models/
+    ├── autoencoder.yaml    # Autoencoder hyperparameters
+    └── emulator.yaml       # Emulator hyperparameters
+```
+
+### Config Files Explained
+
+#### Dataset Config (`configs/datasets/grav.yaml`)
+Defines data paths, physical parameter ranges, and species information:
+- `dataset_path`: Path to HDF5 dataset
+- `physical_parameter_ranges`: Min/max values for density, radiation field, visual extinction, temperature
+- `species_path`: Path to species list file
+- `stoichiometric_matrix_path`: Path to element conservation matrix
+- `metadata`: Column names for trajectory metadata (Index, Model, Time)
+- `phys`: Physical parameter column names
+
+#### Model Configs (`configs/models/`)
+**Autoencoder** (`autoencoder.yaml`):
+- Architecture: `input_dim`, `hidden_dims`, `latent_dim`
+- Training: `lr`, `batch_size`, `dropout`, `noise`
+- Paths: `pretrained_model_path`, `save_model_path`, `latents_minmax_path`
+
+**Emulator** (`emulator.yaml`):
+- Architecture: `input_dim`, `output_dim`, `hidden_dim`, `window_size`
+- Training: `lr`, `batch_size`, `dropout`
+- Paths: `pretrained_model_path`, `save_model_path`
+
+#### Top-Level Configs
+**Autoencoder Training** (`config.yaml`):
+```yaml
+defaults:
+  - datasets: grav
+  - models: autoencoder
+
+device: cuda
+mode: both  # Options: preprocess, train, both
+```
+
+**Emulator Training** (`config_emulator.yaml`):
+```yaml
+defaults:
+  - datasets: grav
+  - models@autoencoder: autoencoder
+  - models@model: emulator
+
+device: cuda
+mode: both
+```
+
+### Training Commands
+
+After installation, use the CLI commands:
+
+```bash
+# Train autoencoder (required first)
+astrochemnet-train-autoencoder
+
+# Train emulator (requires pretrained autoencoder)
+astrochemnet-train-emulator
+
+# Preprocess raw UCLCHEM data
+astrochemnet-preprocess
+```
+
+### Training Modes
+
+All training commands support three execution modes via the `mode` parameter:
+
+- **`mode=preprocess`**: Only preprocess data and save to disk
+- **`mode=train`**: Only train (loads preprocessed data from disk)
+- **`mode=both`**: Preprocess and train in one run (default)
+
+This allows you to preprocess once and run multiple training experiments:
+
+```bash
+# Preprocess data once
+astrochemnet-train-autoencoder mode=preprocess
+
+# Run multiple training experiments with different hyperparameters
+astrochemnet-train-autoencoder mode=train model.lr=1e-3
+astrochemnet-train-autoencoder mode=train model.lr=5e-4 model.dropout=0.2
+```
+
+### Overriding Config Parameters
+
+Override any parameter from the command line using Hydra syntax:
+
+```bash
+# Override learning rate and batch size
+astrochemnet-train-autoencoder model.lr=5e-4 model.batch_size=32768
+
+# Change dataset
+astrochemnet-train-autoencoder dataset=turbulent
+
+# Use different model variant
+astrochemnet-train-autoencoder model=autoencoder_large
+
+# Multiple overrides
+astrochemnet-train-emulator model.lr=1e-3 model.window_size=128 device=cpu
+```
+
+### Config Schemas
+
+Configuration schemas are defined in `src/AstroChemNet/config_schemas.py` using Python dataclasses:
+
+- **`DatasetConfig`**: Dataset paths, physical parameters, species information
+- **`ModelsConfig`**: Reusable model configuration for both autoencoder and emulator
+- **`Config`**: Top-level composition of dataset and model configs
+
+These schemas provide:
+- Type validation at runtime via Hydra
+- Clear documentation of expected config structure
+- Automatic field computation (e.g., `num_species` from species list)
+
+### Preprocessed Data Locations
+
+Training commands save preprocessed data to avoid re-processing:
+
+**Autoencoder:**
+- `data/autoencoder_train_preprocessed.pt`
+- `data/autoencoder_val_preprocessed.pt`
+
+**Emulator:**
+- `data/training_seq.h5`
+- `data/validation_seq.h5`
+
+### Example Workflow
+
+```bash
+# 1. Install package
+pip install -e .
+
+# 2. Train autoencoder with custom hyperparameters
+astrochemnet-train-autoencoder model.lr=1e-3 model.latent_dim=14
+
+# 3. Train emulator using the pretrained autoencoder
+astrochemnet-train-emulator model.window_size=240
+
+# 4. Override device if needed
+astrochemnet-train-emulator device=cpu
+```
+
 ## Gravitational Collapse Benchmark
 
 ## Turbulent Gas Benchmark
-<!-- 
-In order to validate the results of this model, you must download the dataset. The compressed version of this dataset is 9GB. You can download the dataset by downloading data.zip from the following Google Drive link.
-[Click Here to Download Dataset](https://drive.google.com/file/d/1IuEMusFsvDlzqRHD4c5SMUoSv9CJ50gW/view?usp=drive_link)
-You must then place data.zip inside the ChemSurrogate folder and extract it using your preferred method. This will create a data/ folder. Inside the data/ folder are two separate hdf5 files, one named uclchem_rawdata_training.h5 and the other uclchem_rawdata_validation.h5. The first holds 60k models and the second holds 20k models. Information on this dataset is discussed below.
-
-If you are lucky and no bugs occured during the installation, then you may now refer to the examples/ folder for example scripts. Here lies the code which generated the plots in the plots/ folder.
-
-## Training/Validation Dataset
-The dataset is generated using UCLCHEM. Both datasets are sampled separately since Latin Hypercube Sampling is used. A dataset generation script is included in this repository to replicate results. The datasets use the following initial abundances and physical parameter ranges.
-
-All abundances are normalized to H nuclei abundance.
-![Initial Abundances](initial_abundances.jpeg)
-
-These physical parameters are sampled in log space.
-| Parameter  | Range (Min, Max) | Units | Notes |
-|------------|----------------|--------|------------------------------------------------------------|
-| **Density**  | (1e1, 1e6)    | H nuclei per cm³ | Limits arbitrarily chosen. |
-| **Radfield** | (1e-3, 1e3)   | Habing field | Limits arbitrarily chosen. |
-| **Av**       | (1e-2, 1e4)   | Magnitudes | Limits arbitrarily chosen. |
-| **GasTemp**  | (10, 150)     | Kelvin | Grain reactions are too complex below 10K. Ice mostly sublimates at 150K, and UCLChem sets this as a strict constraint. |
-
-![Physical Parameter Sampling](physical_parameter_sampling.png)
-
-60k models were created for training and 20k for validation. The initial abundances are constant for all models, and only the physical parameters are varied. The physical parameters were sampled using latin hypercube sampling in log-space. The Cosmic Ray Ionization Rate is kept constant at 3.0261e-17 ionizations per second. 
-
-With 100 timesteps per model, the total dataset size is 8,000,000 rows of data. Since the model is trained to predict 1-100 timesteps, we can train using all combinations of pairs of abundances. For example (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), ... etc
-
-The validation loss for the results are defined as
-
-loss = abs(actual - predicted) / actual
-
-This loss is calculated for each species and then the mean is calculated. This is calculated for the entire validation set. The species abundances range from 1e-20 to 1. -->

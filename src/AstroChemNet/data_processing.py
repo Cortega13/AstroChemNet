@@ -6,6 +6,7 @@ import re
 import numpy as np
 import torch
 from numba import njit
+from omegaconf import DictConfig
 
 from .inference import Inference
 
@@ -13,25 +14,30 @@ from .inference import Inference
 class Processing:
     """Just for grouping functions with a similar purpose. That way they all have access to tensors which are loaded during configuration."""
 
-    def __init__(self, GeneralConfig, AEConfig=None):
-        self.device = GeneralConfig.device
+    def __init__(
+        self,
+        dataset_cfg: DictConfig,
+        device: str,
+        autoencoder_cfg: DictConfig | None = None,
+    ):
+        self.device = device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
         self.abundances_min = torch.tensor(
-            np.log10(GeneralConfig.abundances_lower_clipping),
+            np.log10(dataset_cfg.abundances_lower_clipping),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_max = torch.tensor(
-            np.log10(GeneralConfig.abundances_upper_clipping),
+            np.log10(dataset_cfg.abundances_upper_clipping),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_min_np = self.abundances_min.cpu().numpy()
         self.abundances_max_np = self.abundances_max.cpu().numpy()
 
-        if AEConfig is not None:
-            latents_minmax = np.load(AEConfig.latents_minmax_path)
+        if autoencoder_cfg is not None:
+            latents_minmax = np.load(autoencoder_cfg.latents_minmax_path)
             print(f"Latents MinMax: {latents_minmax[0]}, {latents_minmax[1]}")
             self.components_min = torch.tensor(
                 latents_minmax[0], dtype=torch.float32, device=self.device
@@ -40,14 +46,14 @@ class Processing:
                 latents_minmax[1], dtype=torch.float32, device=self.device
             )
 
-        self.physical_parameter_ranges = GeneralConfig.physical_parameter_ranges
-        self.species = GeneralConfig.species
-        self.num_species = GeneralConfig.num_species
-        self.stoichiometric_matrix_path = GeneralConfig.stoichiometric_matrix_path
+        self.physical_parameter_ranges = dataset_cfg.physical_parameter_ranges
+        self.species = dataset_cfg.species
+        self.num_species = dataset_cfg.num_species
+        self.stoichiometric_matrix_path = dataset_cfg.stoichiometric_matrix_path
 
     ### PreProcessing Functions
 
-    def physical_parameter_scaling(self, physical_parameters: np.ndarray):
+    def physical_parameter_scaling(self, physical_parameters: np.ndarray) -> None:
         """Preprocesses the dataset by minmax scaling the physical parameters to be within [0, 1]."""
         np.log10(physical_parameters, out=physical_parameters)
         for i, parameter in enumerate(self.physical_parameter_ranges):
@@ -61,7 +67,7 @@ class Processing:
     def jit_abundances_scaling(
         self,
         abundances: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         """Abundances are log10'd and then minmax scaled to be within [0, 1]."""
         abundances = torch.log10(abundances)
         abundances = (abundances - self.abundances_min) / (
@@ -72,7 +78,7 @@ class Processing:
     def abundances_scaling(
         self,
         abundances: np.ndarray,
-    ):
+    ) -> None:
         """Abundances are log10'd and then minmax scaled to be within [0, 1]."""
         np.log10(abundances, out=abundances)
         np.subtract(abundances, self.abundances_min_np, out=abundances)
@@ -85,7 +91,7 @@ class Processing:
     def latent_components_scaling(
         self,
         components: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         """Latent components are scaled to be within [0, 1]."""
         return (components - self.components_min) / (
             self.components_max - self.components_min
@@ -93,7 +99,9 @@ class Processing:
 
     ### PostProcessing Functions
 
-    def inverse_physical_parameter_scaling(self, physical_parameters: np.ndarray):
+    def inverse_physical_parameter_scaling(
+        self, physical_parameters: np.ndarray
+    ) -> None:
         """Reverses the minmax scaling of the physical parameters."""
         for i, parameter in enumerate(self.physical_parameter_ranges):
             param_min, param_max = self.physical_parameter_ranges[parameter]
@@ -113,7 +121,7 @@ class Processing:
         min_: torch.Tensor,
         max_: torch.Tensor,
         exponential_: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         """We use jit to compile the function so that during training there is no casting between array types and cpu/gpu.
 
         Reverses the minmax scaling of the abundances.
@@ -122,19 +130,21 @@ class Processing:
         abundances = torch.exp(exponential_ * log_abundances)
         return abundances
 
-    def inverse_abundances_scaling(self, abundances):
+    def inverse_abundances_scaling(
+        self, abundances: torch.Tensor | np.ndarray
+    ) -> torch.Tensor | np.ndarray:
         """Reverses the minmax scaling of the abundances.
 
         Is able to handle both torch tensor or numpy inputs.
         """
         if isinstance(abundances, torch.Tensor):
-            abundances = self.jit_inverse_abundances_scaling(
+            result = self.jit_inverse_abundances_scaling(
                 abundances,
                 self.abundances_min,
                 self.abundances_max,
                 self.exponential,
             )
-            return abundances
+            return result
         else:
             ab_min_np = self.abundances_min.cpu().numpy()
             ab_max_np = self.abundances_max.cpu().numpy()
@@ -143,12 +153,13 @@ class Processing:
             np.multiply(abundances, (ab_max_np - ab_min_np), out=abundances)
             np.add(abundances, ab_min_np, out=abundances)
             np.exp(exponential_np * abundances, out=abundances)
+            return abundances
 
     @staticmethod
     @torch.jit.script
     def jit_inverse_latent_component_scaling(
         scaled_components: torch.Tensor, min_: torch.Tensor, max_: torch.Tensor
-    ):
+    ) -> torch.Tensor:
         """We use jit to compile the function so that during training there is no casting between array types and cpu/gpu.
 
         Reverses the latent component scaling.
@@ -158,7 +169,7 @@ class Processing:
     def inverse_latent_components_scaling(
         self,
         scaled_components: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         """Reverses the latent component scaling."""
         return self.jit_inverse_latent_component_scaling(
             scaled_components, self.components_min, self.components_max
@@ -166,10 +177,10 @@ class Processing:
 
     def save_latents_minmax(
         self,
-        AEConfig,
+        autoencoder_cfg: DictConfig,
         dataset_t: torch.Tensor,
         inference_functions: Inference,
-    ):
+    ) -> None:
         """For minmax scaling the latent components we need to have the minimum and maximum latent values produced by the autoencoder.
 
         This function saves them to the path defined in the general configuration file.
@@ -177,17 +188,17 @@ class Processing:
         min_, max_ = float("inf"), float("-inf")
 
         with torch.no_grad():
-            for i in range(0, len(dataset_t), AEConfig.batch_size):
-                batch = dataset_t[i : i + AEConfig.batch_size].to(self.device)
+            for i in range(0, len(dataset_t), autoencoder_cfg.batch_size):
+                batch = dataset_t[i : i + autoencoder_cfg.batch_size].to(self.device)
                 encoded = inference_functions.encode(batch).cpu()
                 min_ = min(min_, encoded.min().item())
                 max_ = max(max_, encoded.max().item())
 
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
-        np.save(AEConfig.latents_minmax_path, minmax_np)
+        np.save(autoencoder_cfg.latents_minmax_path, minmax_np)
 
-    def build_stoichiometric_matrix(self):
+    def build_stoichiometric_matrix(self) -> np.ndarray:
         """Generates a stoichiometric matrix S from the species x in the dataset.
 
         By doing the operation x @ S we obtain the elemental abundances n.
@@ -229,7 +240,7 @@ class Processing:
 def calculate_emulator_indices(
     dataset_np: np.ndarray,
     window_size: int = 16,
-):
+) -> np.ndarray:
     """The emulator training elements have significant overlap in the rows they use from the dataset."""
     change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
     model_groups = np.split(dataset_np, change_indices)
@@ -253,16 +264,16 @@ def calculate_emulator_indices(
 
 
 def preprocessing_emulator_dataset(
-    GeneralConfig,
-    EMConfig,
+    dataset_cfg: DictConfig,
+    emulator_cfg: DictConfig,
     dataset_np: np.ndarray,
     processing_functions: Processing,
     inference_functions: Inference,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Generates index pairs for training."""
-    num_species = GeneralConfig.num_species
-    num_phys = GeneralConfig.num_phys
-    num_metadata = GeneralConfig.num_metadata
+    num_species = dataset_cfg.num_species
+    num_phys = dataset_cfg.num_phys
+    num_metadata = dataset_cfg.num_metadata
 
     dataset_np[:, 0] = np.arange(len(dataset_np))
 
@@ -280,7 +291,7 @@ def preprocessing_emulator_dataset(
     encoded_dataset_np = np.hstack((dataset_np, latent_components), dtype=np.float32)
 
     index_pairs_np = calculate_emulator_indices(
-        encoded_dataset_np, EMConfig.window_size
+        encoded_dataset_np, emulator_cfg.window_size
     )
 
     perm = np.random.permutation(len(index_pairs_np))

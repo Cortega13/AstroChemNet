@@ -2,31 +2,29 @@
 
 import gc
 import os
-from typing import Any
 
 import h5py
 import numpy as np
 import pandas as pd
 import torch
+from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset, Sampler
-
-from .data_loading import AutoencoderDataset, EmulatorSequenceDataset
 
 
 def load_datasets(
-    GeneralConfig: Any,
-    columns: list,
-):
+    dataset_cfg: DictConfig,
+    columns: list[str],
+) -> tuple[np.ndarray, np.ndarray]:
     """Datasets are loaded from hdf5 files, filtered to only contain the columns of interest, and converted to np arrays for speed."""
     training_dataset = pd.read_hdf(
-        GeneralConfig.dataset_path,
+        dataset_cfg.dataset_path,
         "train",
         start=0,
         # stop=5000,
         # stop=1500000
     ).astype(np.float32)
     validation_dataset = pd.read_hdf(
-        GeneralConfig.dataset_path,
+        dataset_cfg.dataset_path,
         "val",
         start=0,
         # stop=5000,
@@ -37,17 +35,17 @@ def load_datasets(
     validation_np = validation_dataset[columns].to_numpy(copy=False)
 
     np.clip(
-        training_np[:, -GeneralConfig.num_species :],
-        GeneralConfig.abundances_lower_clipping,
-        GeneralConfig.abundances_upper_clipping,
-        out=training_np[:, -GeneralConfig.num_species :],
+        training_np[:, -dataset_cfg.num_species :],
+        dataset_cfg.abundances_lower_clipping,
+        dataset_cfg.abundances_upper_clipping,
+        out=training_np[:, -dataset_cfg.num_species :],
     )
 
     np.clip(
-        validation_np[:, -GeneralConfig.num_species :],
-        GeneralConfig.abundances_lower_clipping,
-        GeneralConfig.abundances_upper_clipping,
-        out=validation_np[:, -GeneralConfig.num_species :],
+        validation_np[:, -dataset_cfg.num_species :],
+        dataset_cfg.abundances_lower_clipping,
+        dataset_cfg.abundances_upper_clipping,
+        out=validation_np[:, -dataset_cfg.num_species :],
     )
 
     del training_dataset, validation_dataset
@@ -56,19 +54,21 @@ def load_datasets(
 
 
 def save_tensors_to_hdf5(
-    GeneralConfig, tensors: tuple[torch.Tensor, torch.Tensor], category: str
-):
+    working_path: str, tensors: tuple[torch.Tensor, torch.Tensor], category: str
+) -> None:
     """Save the dataset along with the encoded species and indices in tensor format."""
     dataset, indices = tensors
-    dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "w") as f:
         f.create_dataset("dataset", data=dataset.numpy(), dtype=np.float32)
         f.create_dataset("indices", data=indices.numpy(), dtype=np.int32)
 
 
-def load_tensors_from_hdf5(GeneralConfig: Any, category: str):
+def load_tensors_from_hdf5(
+    working_path: str, category: str
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Load saved tensors to quickly run an emulator training session."""
-    dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]  # type: ignore
         indices = f["indices"][:]  # type: ignore
@@ -96,7 +96,8 @@ class ChunkedShuffleSampler(Sampler):
 
         self.generator = torch.Generator()
 
-    def set_epoch(self, epoch: int):
+    def set_epoch(self, epoch: int) -> None:
+        """Set the current epoch for reproducible shuffling."""
         self.epoch = epoch
 
     def __iter__(self):
@@ -117,12 +118,14 @@ class ChunkedShuffleSampler(Sampler):
 
             yield from chunk_perm.tolist()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.data_size
 
 
 class AutoencoderDataset(Dataset):
-    """This defines the Tensor Dataset for the autoencoder training. We use the new "__getitems__" method which can load all elements in a batch at once.
+    """Tensor Dataset for autoencoder training.
+
+    Uses the "__getitems__" method which can load all elements in a batch at once.
     Since our batch sizes are ~10^3, instead of having ~10^3 calls to this function we only have 1.
     """
 
@@ -134,7 +137,7 @@ class AutoencoderDataset(Dataset):
         data_matrix_size = self.data_matrix.nbytes / (1024**2)
         print(f"Data_matrix Memory usage: {data_matrix_size:.3f} MB")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data_matrix)
 
     def __getitems__(self, indices: list[int]) -> tuple[torch.Tensor, int]:
@@ -144,27 +147,29 @@ class AutoencoderDataset(Dataset):
 
 
 class EmulatorSequenceDataset(Dataset):
-    """This defines the Tensor Dataset for the emulator training. We use the new "__getitems__" method which can load multiple rows of data at once.
-    Since we reuse rows of data for elements of the training dataset, we can recall the rows on the fly for batches. This reduces memory overhead significantly.
+    """Tensor Dataset for emulator training.
+
+    Uses the "__getitems__" method which can load multiple rows of data at once.
+    Since we reuse rows of data for elements of the training dataset, we can recall the rows on the fly for batches.
+    This reduces memory overhead significantly.
     """
 
     def __init__(
         self,
-        GeneralConfig,
-        AEConfig,
+        dataset_cfg: DictConfig,
+        autoencoder_cfg: DictConfig,
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ):
-        self.device = GeneralConfig.device
         # self.data_matrix = data_matrix.to(self.device).contiguous()
         # self.data_indices = data_indices.to(self.device).contiguous()
         self.data_matrix = data_matrix.contiguous()
         self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
-        self.num_metadata = GeneralConfig.num_metadata
-        self.num_phys = GeneralConfig.num_phys
-        self.num_species = GeneralConfig.num_species
-        self.num_latents = AEConfig.latent_dim
+        self.num_metadata = dataset_cfg.num_metadata
+        self.num_phys = dataset_cfg.num_phys
+        self.num_species = dataset_cfg.num_species
+        self.num_latents = autoencoder_cfg.latent_dim
 
         data_matrix_size = self.data_matrix.nbytes / (1024**2)
         indices_matrix_size = self.data_indices.nbytes / (1024**2)
@@ -174,10 +179,12 @@ class EmulatorSequenceDataset(Dataset):
 
         print(f"Dataset Size: {len(data_indices)}\n")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_datapoints
 
-    def __getitems__(self, indices: list):
+    def __getitems__(
+        self, indices: list[int]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # indices = torch.tensor(indices, dtype=torch.long, device=self.device)
 
         data_indices = self.data_indices[indices]
@@ -193,7 +200,9 @@ class EmulatorSequenceDataset(Dataset):
         return physical_parameters, features, targets
 
 
-def collate_function(batch):
+def collate_function(
+    batch: tuple[torch.Tensor, ...] | tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+) -> tuple[torch.Tensor, ...]:
     """The collate_function usually pulls from the Tensor Dataset in (features, targets) format. Here we account for the physical parameters as well."""
     if len(batch) == 2:
         features, targets = batch
@@ -204,16 +213,16 @@ def collate_function(batch):
 
 
 def tensor_to_dataloader(
-    training_config: Any,
+    model_cfg: DictConfig,
     torchDataset: AutoencoderDataset | EmulatorSequenceDataset,
-):
+) -> DataLoader:
     """Create a DataLoader for the given Torch Dataset."""
     data_size = len(torchDataset)
-    multiplier = training_config.shuffle_chunk_size
+    multiplier = model_cfg.shuffle_chunk_size
     sampler = ChunkedShuffleSampler(data_size, chunk_size=multiplier * data_size)
     dataloader = DataLoader(
         torchDataset,
-        batch_size=training_config.batch_size,
+        batch_size=model_cfg.batch_size,
         pin_memory=True,
         num_workers=10,
         in_order=False,
