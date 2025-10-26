@@ -1,0 +1,23 @@
+defaults:
+  - datasets: grav
+  - _self_
+
+working_path: ${oc.env:PWD}
+
+# Preprocessing parameters
+input_path: ${working_path}/data/gravitational_collapse.h5
+output_path: ${working_path}/data/grav_collapse_clean.h5
+input_key: df
+
+# Columns to drop from raw data
+columns_to_drop: [dustTemp, dstep, zeta, SURFACE, BULK]
+
+# Train/validation split
+train_split: 0.75
+seed: 42
+
+# Physical parameters to include
+params: [Density, Radfield, Av, gasTemp]
+
+# Minimum Radfield value
+min_radfield: 1.0e-4

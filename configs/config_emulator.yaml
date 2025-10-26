@@ -6,3 +6,4 @@ defaults:
 
 working_path: ${oc.env:PWD}
 device: cuda
+mode: both  # Options: preprocess, train, both

@@ -1,6 +1,4 @@
-"""We grouped all the data processing functions into a single class for better organization and reusability.
-We have the preprocessing and postprocessing functions. These include scaling the abundances and physical parameters.
-"""
+"""Grouped data processing functions into a single class for better organization and reusability."""
 
 import gc
 import re
@@ -95,10 +93,8 @@ class Processing:
 
     ### PostProcessing Functions
 
-    def inverse_physical_parameter_scaling(self, physical_parameters: np.array):
-        """Reverses the minmax scaling of the physical parameters.
-        Operates in-place.
-        """
+    def inverse_physical_parameter_scaling(self, physical_parameters: np.ndarray):
+        """Reverses the minmax scaling of the physical parameters."""
         for i, parameter in enumerate(self.physical_parameter_ranges):
             param_min, param_max = self.physical_parameter_ranges[parameter]
             log_param_min, log_param_max = np.log10(param_min), np.log10(param_max)
@@ -234,9 +230,7 @@ def calculate_emulator_indices(
     dataset_np: np.ndarray,
     window_size: int = 16,
 ):
-    """The emulator training elements have significant overlap in the rows they use from the dataset.
-    This basically generates which indices are needed for each training element, so that during training it is recalled on the fly.
-    """
+    """The emulator training elements have significant overlap in the rows they use from the dataset."""
     change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
     model_groups = np.split(dataset_np, change_indices)
 
@@ -261,14 +255,11 @@ def calculate_emulator_indices(
 def preprocessing_emulator_dataset(
     GeneralConfig,
     EMConfig,
-    dataset_np: np.array,
+    dataset_np: np.ndarray,
     processing_functions: Processing,
     inference_functions: Inference,
-):
-    """Generates index pairs for training.
-    Generates latent components using autoencoder for the dataset.
-    Scales physical parameters
-    """
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Generates index pairs for training."""
     num_species = GeneralConfig.num_species
     num_phys = GeneralConfig.num_phys
     num_metadata = GeneralConfig.num_metadata

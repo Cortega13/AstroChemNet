@@ -36,7 +36,7 @@ class Emulator(nn.Module):
         return outputs
 
 
-def load_emulator(Emulator: Emulator, GeneralConfig, EMConfig, inference=False):
+def load_emulator(Emulator: type[Emulator], GeneralConfig, EMConfig, inference=False):
     emulator = Emulator(
         input_dim=EMConfig.input_dim,
         output_dim=EMConfig.output_dim,

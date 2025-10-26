@@ -18,23 +18,63 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
+The package provides CLI commands for training models after installation. If you've previously installed the package, reinstall to register the CLI commands:
+```bash
+pip install -e . --force-reinstall --no-deps
+```
+
 ### Training Models
+
+After installing the package, use the CLI commands:
 
 Train the autoencoder first (required before training emulator):
 ```bash
-python scripts/train/train_autoencoder.py
+astrochemnet-train-autoencoder
 ```
 
 Train the emulator (requires pretrained autoencoder):
 ```bash
-python scripts/train/train_emulator.py model=emulator
+astrochemnet-train-emulator
 ```
 
 Override config parameters from command line:
 ```bash
-python scripts/train/train_autoencoder.py model.lr=1e-4 model.batch_size=32768
-python scripts/train/train_emulator.py dataset=grav model=emulator model.hidden_dim=256
+astrochemnet-train-autoencoder model.lr=1e-4 model.batch_size=32768
+astrochemnet-train-emulator device=cpu model.window_size=128
 ```
+
+Change dataset or model variant:
+```bash
+astrochemnet-train-autoencoder dataset=grav model=autoencoder_large
+astrochemnet-train-emulator dataset=turbulent
+```
+
+**Preprocessing and Training Modes:**
+
+You can control whether to preprocess data, train, or do both with the `mode` flag:
+
+```bash
+# Only preprocess data (saves to disk)
+astrochemnet-train-autoencoder mode=preprocess
+astrochemnet-train-emulator mode=preprocess
+
+# Only train (loads preprocessed data from disk)
+astrochemnet-train-autoencoder mode=train
+astrochemnet-train-emulator mode=train
+
+# Both preprocess and train (default)
+astrochemnet-train-autoencoder mode=both
+astrochemnet-train-emulator  # mode=both is default
+```
+
+This is useful for:
+- Preprocessing large datasets once, then running multiple training experiments
+- Debugging preprocessing separately from training
+- Running preprocessing on a different machine than training
+
+**Preprocessed Data Locations:**
+- Autoencoder: `data/autoencoder_train_preprocessed.pt`, `data/autoencoder_val_preprocessed.pt`
+- Emulator: `data/training_seq.h5`, `data/validation_seq.h5`
 
 ### Code Quality
 
@@ -200,6 +240,8 @@ Autoencoder uses tied weights (decoder reuses transposed encoder weights) to:
 ## File Organization
 
 ### Core Package (`src/AstroChemNet/`)
+- `cli.py` - Command-line interface entry points for training
+- `config_schemas.py` - Hydra structured config dataclasses
 - `trainer.py` - Training loops and optimization logic
 - `loss.py` - Custom loss functions with conservation constraints
 - `data_loading.py` - HDF5 loading, Dataset/DataLoader implementations
@@ -216,6 +258,7 @@ Autoencoder uses tied weights (decoder reuses transposed encoder weights) to:
 - `vibecode/` - ViBe baseline experiments and comparison scripts
 - `research/` - Exploratory Jupyter notebooks
 - `scripts/analysis/` - Post-training analysis notebooks
+- `scripts/train/` - **Deprecated** training scripts (use CLI commands instead)
 
 ### Data Storage
 - `data/` - Local HDF5 datasets (not in repo, download separately)
@@ -238,12 +281,12 @@ The `requirements.txt` file appears to have encoding issues. Expected dependenci
 
 1. Ensure dataset exists at path specified in `configs/datasets/grav.yaml`
 2. Configure hyperparameters by editing YAML files in `configs/models/` or via CLI overrides
-3. Train autoencoder first: `python scripts/train/train_autoencoder.py`
-4. After autoencoder converges, train emulator: `python scripts/train/train_emulator.py model=emulator`
+3. Train autoencoder first: `astrochemnet-train-autoencoder`
+4. After autoencoder converges, train emulator: `astrochemnet-train-emulator`
 
 Example with hyperparameter tuning:
 ```bash
-python scripts/train/train_autoencoder.py model.lr=5e-4 model.dropout=0.25 model.batch_size=32768
+astrochemnet-train-autoencoder model.lr=5e-4 model.dropout=0.25 model.batch_size=32768
 ```
 
 ### Evaluating Models
@@ -257,13 +300,13 @@ Use `src/AstroChemNet/inference.py` which provides the `Inference` class for:
 
 1. Create new YAML file in `configs/datasets/` (e.g., `turbulent.yaml`)
 2. Define dataset path, physical parameter ranges, and species list
-3. Train with: `python scripts/train/train_autoencoder.py dataset=turbulent`
+3. Train with: `astrochemnet-train-autoencoder dataset=turbulent`
 
 ### Adding New Model Variants
 
 1. Create new YAML file in `configs/models/` (e.g., `autoencoder_large.yaml`)
 2. Define architecture and hyperparameters (reuses `ModelsConfig` schema)
-3. Train with: `python scripts/train/train_autoencoder.py model=autoencoder_large`
+3. Train with: `astrochemnet-train-autoencoder model=autoencoder_large`
 
 ### Adding New Species or Physical Parameters
 

@@ -52,10 +52,10 @@ def load_datasets(
     return training_np, validation_np
 
 
-def save_tensors_to_hdf5(GeneralConfig, tensors: torch.Tensor, category: str):
-    """For convenience, we save the dataset along with the encoded species and indices in tensor format.
-    This allows us to quickly load everything needed to train the emulator.
-    """
+def save_tensors_to_hdf5(
+    GeneralConfig, tensors: tuple[torch.Tensor, torch.Tensor], category: str
+):
+    """Save the dataset along with the encoded species and indices in tensor format."""
     dataset, indices = tensors
     dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "w") as f:
@@ -134,9 +134,9 @@ class AutoencoderDataset(Dataset):
     def __len__(self):
         return len(self.data_matrix)
 
-    def __getitems__(self, indices: list):
-        indices = torch.tensor(indices, dtype=torch.long)
-        features = self.data_matrix[indices]
+    def __getitems__(self, indices: list[int]) -> tuple[torch.Tensor, int]:
+        tensor_indices = torch.tensor(indices, dtype=torch.long)
+        features = self.data_matrix[tensor_indices]
         return features, 1
 
 
