@@ -16,19 +16,19 @@ The training pipeline follows this sequence:
 
 1. Raw Data → Preprocessing → Cleaned HDF5
    ├── Command: astrochemnet-preprocess
-   └── Config: configs/preprocess.yaml
+   └── Config: configs/datasets/grav.yaml
 
 2. Cleaned HDF5 → Autoencoder Training → Latent Space Model
    ├── Command: astrochemnet-train-autoencoder
    ├── Config: configs/config.yaml (dataset + autoencoder)
    └── Outputs:
-       ├── weights/autoencoder.pth
+       ├── outputs/weights/autoencoder.pth
        └── utils/latents_minmax.npy
 
 3. Latent Space → Emulator Training → Temporal Dynamics Model
    ├── Command: astrochemnet-train-emulator
    ├── Config: configs/config_emulator.yaml (dataset + autoencoder + emulator)
-   └── Output: weights/emulator.pth
+   └── Output: outputs/weights/emulator.pth
 
 Available Commands
 -----------------
@@ -98,27 +98,19 @@ Each module is self-contained with:
 Import Structure
 ---------------
 
-Commands are exposed through their respective modules:
+Commands are exposed through their respective modules and are registered
+as entry points in pyproject.toml [project.scripts] section.
+
+For programmatic access (if needed), import directly from the modules:
 
     from AstroChemNet.cli.preprocess import main as preprocess_dataset
     from AstroChemNet.cli.train_autoencoder import main as train_autoencoder
     from AstroChemNet.cli.train_emulator import main as train_emulator
-
-These entry points are registered in pyproject.toml [project.scripts] section.
 """
-
-# Import main functions for programmatic access
-from .preprocess import main as preprocess_dataset
-from .train_autoencoder import main as train_autoencoder
-from .train_emulator import main as train_emulator
-
-__all__ = [
-    "preprocess_dataset",
-    "train_autoencoder",
-    "train_emulator",
-]
 
 # CLI version information
 __version__ = "0.1.0"
-__author__ = "AstroChemNet Team"
+__author__ = "AstroChemNet"
 __description__ = "Command-line interface for AstroChemNet surrogate model training"
+
+__all__ = ["__version__", "__author__", "__description__"]

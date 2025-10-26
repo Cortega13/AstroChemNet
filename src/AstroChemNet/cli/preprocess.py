@@ -48,7 +48,7 @@ def preprocess_dataset(cfg: DictConfig):
     """Preprocess raw UCLCHEM data into cleaned HDF5 format.
 
     Args:
-        cfg: Hydra configuration with preprocessing parameters.
+        cfg: Hydra configuration with dataset parameters.
     """
     print("=" * 80)
     print("Preprocessing UCLCHEM Dataset")
@@ -61,23 +61,27 @@ def preprocess_dataset(cfg: DictConfig):
     ).tolist()
 
     # Load raw data
-    print(f"\nLoading raw data from {cfg.input_path}...")
-    df = pd.read_hdf(cfg.input_path, key=cfg.input_key)
+    print(f"\nLoading raw data from {cfg.dataset.preprocessing.input_path}...")
+    df = pd.read_hdf(
+        cfg.dataset.preprocessing.input_path, key=cfg.dataset.preprocessing.input_key
+    )
     print(f"Loaded {len(df)} rows with {len(df.columns)} columns")
 
     # Rename columns
     df.columns = rename_columns(df.columns)
 
     # Drop unwanted columns
-    if cfg.columns_to_drop:
-        print(f"\nDropping columns: {cfg.columns_to_drop}")
-        df = df.drop(columns=cfg.columns_to_drop, errors="ignore")
+    if cfg.dataset.preprocessing.columns_to_drop:
+        print(f"\nDropping columns: {cfg.dataset.preprocessing.columns_to_drop}")
+        df = df.drop(columns=cfg.dataset.preprocessing.columns_to_drop, errors="ignore")
         print(f"Remaining columns: {len(df.columns)}")
 
     # Set minimum radfield. Radfield goes several orders of magnitude lower than 1e-4, but I suspect this has little effect on abundances.
-    if hasattr(cfg, "min_radfield"):
-        print(f"Setting Minimum Radfield to {cfg.min_radfield}")
-        df["Radfield"] = np.maximum(df["Radfield"], cfg.min_radfield)
+    if hasattr(cfg.dataset.preprocessing, "min_radfield"):
+        print(f"Setting Minimum Radfield to {cfg.dataset.preprocessing.min_radfield}")
+        df["Radfield"] = np.maximum(
+            df["Radfield"], cfg.dataset.preprocessing.min_radfield
+        )
 
     # Load initial abundances.
     df_init = load_initial_abundances(cfg, species)
@@ -104,16 +108,21 @@ def preprocess_dataset(cfg: DictConfig):
     df.insert(0, "Index", range(len(df)))
     df = df[cfg.dataset.metadata + cfg.dataset.phys + species]
 
+    # Apply species lower and upper clipping.
+    df[species] = df[species].clip(
+        lower=cfg.dataset.abundances_clipping.lower,
+        upper=cfg.dataset.abundances_clipping.upper,
+    )
     # Split into train/validation
-    print(f"\nSplitting data (train_split={cfg.train_split})...")
-    np.random.seed(cfg.seed)
+    print(f"\nSplitting data (train_split={cfg.dataset.preprocessing.train_split})...")
+    np.random.seed(cfg.dataset.preprocessing.seed)
 
     # Shuffling the tracer indices.
     tracers = df["Model"].unique()
     np.random.shuffle(tracers)
 
-    # 75% train, 25% validation split based off the shuffled tracer indices.
-    split_idx = int(len(tracers) * 0.75)
+    # Train/validation split based off the shuffled tracer indices.
+    split_idx = int(len(tracers) * cfg.dataset.preprocessing.train_split)
 
     train_tracers = tracers[:split_idx]
     val_tracers = tracers[split_idx:]
@@ -124,25 +133,22 @@ def preprocess_dataset(cfg: DictConfig):
     train_df = train_df.reset_index(drop=True)
     val_df = val_df.reset_index(drop=True)
 
-    train_df.to_hdf("data/grav_collapse_clean.h5", key="train", mode="w")
-    val_df.to_hdf("data/grav_collapse_clean.h5", key="val", mode="a")
+    train_df.to_hdf(cfg.dataset.preprocessing.output_path, key="train", mode="w")
+    val_df.to_hdf(cfg.dataset.preprocessing.output_path, key="val", mode="a")
 
     print("\nPreprocessing complete!")
-    print(f"Saved to: {cfg.output_path}")
+    print(f"Saved to: {cfg.dataset.preprocessing.output_path}")
     print(f"  - /train: {len(train_df)} rows")
     print(f"  - /val: {len(val_df)} rows")
 
 
-@hydra.main(config_path="../../../configs", config_name="preprocess", version_base=None)
+@hydra.main(config_path="../../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     """Main entry point for data preprocessing CLI command.
 
     Args:
         cfg: Hydra configuration object from preprocess.yaml with CLI overrides.
     """
-    # Get working directory
-    cfg.working_path = os.getcwd()
-
     # Run preprocessing
     preprocess_dataset(cfg)
 

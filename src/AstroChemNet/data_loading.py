@@ -2,6 +2,7 @@
 
 import gc
 import os
+from typing import Optional
 
 import h5py
 import numpy as np
@@ -11,45 +12,27 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 
-def load_datasets(
+def load_dataset(
     dataset_cfg: DictConfig,
-    columns: list[str],
-) -> tuple[np.ndarray, np.ndarray]:
+    max_len: Optional[int] = None,
+    total: bool = False,
+) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
     """Datasets are loaded from hdf5 files, filtered to only contain the columns of interest, and converted to np arrays for speed."""
     training_dataset = pd.read_hdf(
-        dataset_cfg.dataset_path,
-        "train",
-        start=0,
-        # stop=5000,
-        # stop=1500000
+        dataset_cfg.dataset_path, "train", start=0, stop=max_len
     ).astype(np.float32)
     validation_dataset = pd.read_hdf(
-        dataset_cfg.dataset_path,
-        "val",
-        start=0,
-        # stop=5000,
-        # stop=1500000
+        dataset_cfg.dataset_path, "val", start=0, stop=max_len
     ).astype(np.float32)
 
-    training_np = training_dataset[columns].to_numpy(copy=False)
-    validation_np = validation_dataset[columns].to_numpy(copy=False)
+    training_np = training_dataset.to_numpy(copy=False)
+    validation_np = validation_dataset.to_numpy(copy=False)
 
-    np.clip(
-        training_np[:, -dataset_cfg.num_species :],
-        dataset_cfg.abundances_lower_clipping,
-        dataset_cfg.abundances_upper_clipping,
-        out=training_np[:, -dataset_cfg.num_species :],
-    )
-
-    np.clip(
-        validation_np[:, -dataset_cfg.num_species :],
-        dataset_cfg.abundances_lower_clipping,
-        dataset_cfg.abundances_upper_clipping,
-        out=validation_np[:, -dataset_cfg.num_species :],
-    )
-
-    del training_dataset, validation_dataset
     gc.collect()
+    if total:
+        combined = np.concatenate((training_np, validation_np), axis=0)
+        return combined
+
     return training_np, validation_np
 
 
@@ -227,6 +210,6 @@ def tensor_to_dataloader(
         num_workers=10,
         in_order=False,
         sampler=sampler,
-        collate_fn=collate_function,
+        collate_fn=collate_function,  # type:ignore
     )
     return dataloader

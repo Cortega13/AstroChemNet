@@ -8,18 +8,39 @@ from hydra.core.config_store import ConfigStore
 
 
 @dataclass
+class AbundancesClippingConfig:
+    """Abundances clipping range configuration."""
+
+    lower: float
+    upper: float
+
+
+@dataclass
+class PreprocessingConfig:
+    """Preprocessing configuration for raw UCLCHEM data."""
+
+    input_path: str
+    output_path: str
+    input_key: str
+    columns_to_drop: list[str]
+    train_split: float
+    seed: int
+    min_radfield: float
+
+
+@dataclass
 class DatasetConfig:
     """Dataset configuration including paths, physical parameters, and species."""
 
     dataset_path: str
     physical_parameter_ranges: dict[str, list[float]]
-    abundances_lower_clipping: float
-    abundances_upper_clipping: float
+    abundances_clipping: AbundancesClippingConfig
     metadata: list[str]
     phys: list[str]
     initial_abundances_path: str
     stoichiometric_matrix_path: str
     species_path: str
+    preprocessing: PreprocessingConfig | None = None
 
     # Computed fields populated in __post_init__
     initial_abundances: Any = field(init=False, repr=False, default=None)

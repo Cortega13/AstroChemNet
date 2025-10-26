@@ -24,12 +24,12 @@ class Processing:
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
         self.abundances_min = torch.tensor(
-            np.log10(dataset_cfg.abundances_lower_clipping),
+            np.log10(dataset_cfg.abundances_clipping.lower),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_max = torch.tensor(
-            np.log10(dataset_cfg.abundances_upper_clipping),
+            np.log10(dataset_cfg.abundances_clipping.upper),
             dtype=torch.float32,
             device=self.device,
         )

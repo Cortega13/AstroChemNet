@@ -15,3 +15,5 @@ __pycache__/
 *.pt
 .vscode/
 outputs/*
+
+*.egg-info

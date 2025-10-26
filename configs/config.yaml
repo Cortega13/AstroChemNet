@@ -3,6 +3,5 @@ defaults:
   - models: autoencoder
   - _self_
 
-working_path: ${oc.env:PWD}
-device: cuda
-mode: both  # Options: preprocess, train, both
+working_path: "C:\\Users\\carlo\\Projects\\AstroResearch\\AstroChemNet"
+device: cpu
