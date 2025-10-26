@@ -1,11 +1,15 @@
 """PCA on the chemical trajectories and the physical parameter trajectories."""
 
+from pathlib import Path
+from re import A
 from typing import cast
 
 import hydra
+import matplotlib.pyplot as plt
 import numpy as np
 from omegaconf import DictConfig
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 import AstroChemNet.data_loading as dl
 
@@ -34,6 +38,7 @@ def extract_trajectories(cfg: DictConfig, dataset):
 
     abundances_trajectories = {}
     parameter_trajectories = {}
+    final_log_density = []
 
     for model in unique_models:
         mask = dataset[:, 1] == model
@@ -43,9 +48,16 @@ def extract_trajectories(cfg: DictConfig, dataset):
         abundances_trajectories[model] = np.log10(abundances + 1e-20)
 
         parameters = subset[:, num_metadata : num_metadata + num_params].copy()
-        parameter_trajectories[model] = np.log10(parameters + 1e-4)
+        parameter_trajectories[model] = parameters
 
-    return parameter_trajectories, abundances_trajectories
+        # add parameters to abundances trajectories
+        abundances_trajectories[model] = np.hstack(
+            (abundances_trajectories[model], parameters)
+        )
+
+        final_log_density.append(np.log10(subset[-1, num_metadata]))
+
+    return parameter_trajectories, abundances_trajectories, final_log_density
 
 
 def calculate_pca(trajectories):
@@ -64,11 +76,9 @@ def calculate_pca(trajectories):
     if len(data) == 0:
         raise ValueError("No models found.")
 
-    pca = PCA(n_components=50)
+    pca = PCA(n_components=5)
     reduced_data = pca.fit_transform(data)
 
-    print(f"Explained variance ratios: {pca.explained_variance_ratio_}")
-    print()
     print(f"Cumulative explained variance: {np.cumsum(pca.explained_variance_ratio_)}")
     print()
     print(f"Original data shape: {data.shape}")
@@ -77,16 +87,51 @@ def calculate_pca(trajectories):
     return reduced_data
 
 
-def plot_tsne(trajectories):
+def plot_tsne(reduced_data, final_log_density, name):
     """Plot t-SNE visualization of the reduced trajectories."""
+    # Apply t-SNE to reduce to 2D
+    print(f"Applying t-SNE to {name} data...")
+    tsne = TSNE(n_components=2, random_state=42, perplexity=100)
+    tsne_data = tsne.fit_transform(reduced_data)
+
+    # Create output directory
+    output_dir = Path("outputs/plots/pca_tsne")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create scatter plot
+    plt.figure(figsize=(10, 8))
+    scatter = plt.scatter(
+        tsne_data[:, 0],
+        tsne_data[:, 1],
+        c=final_log_density,
+        s=0.2,
+        cmap="viridis",
+        alpha=0.8,
+    )
+    plt.colorbar(scatter, label="log10(Density) [H nuclei/cm³]")
+    plt.xlabel("t-SNE Component 1")
+    plt.ylabel("t-SNE Component 2")
+    plt.title(
+        f"t-SNE Visualization of {name.capitalize()} Trajectories\n(colored by density at last timestep)"
+    )
+    plt.tight_layout()
+
+    # Save plot
+    output_path = output_dir / f"tsne_{name}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    print(f"Saved t-SNE plot to {output_path}")
+    plt.close()
 
 
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     """Main function to run pca on abundances and parameters."""
+    print("Starting PCA TSNE analysis.")
     data_np = load_datasets(cfg.dataset)
 
-    parameter_trajectories, abundances_trajectories = extract_trajectories(cfg, data_np)
+    parameter_trajectories, abundances_trajectories, final_log_density = (
+        extract_trajectories(cfg, data_np)
+    )
 
     print("PCA on parameter trajectories:")
     reduced_param_trajectories = calculate_pca(parameter_trajectories)
@@ -94,8 +139,8 @@ def main(cfg: DictConfig):
     print("PCA on abundances trajectories:")
     reduced_abund_trajectories = calculate_pca(abundances_trajectories)
 
-    plot_tsne(reduced_param_trajectories)
-    plot_tsne(reduced_abund_trajectories)
+    plot_tsne(reduced_param_trajectories, final_log_density, "parameters")
+    plot_tsne(reduced_abund_trajectories, final_log_density, "abundances")
 
 
 if __name__ == "__main__":
