@@ -2,6 +2,7 @@
 
 import gc
 import os
+from typing import Any
 
 import h5py
 import numpy as np
@@ -9,9 +10,11 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
+from .data_loading import AutoencoderDataset, EmulatorSequenceDataset
+
 
 def load_datasets(
-    GeneralConfig,
+    GeneralConfig: Any,
     columns: list,
 ):
     """Datasets are loaded from hdf5 files, filtered to only contain the columns of interest, and converted to np arrays for speed."""
@@ -63,12 +66,12 @@ def save_tensors_to_hdf5(
         f.create_dataset("indices", data=indices.numpy(), dtype=np.int32)
 
 
-def load_tensors_from_hdf5(GeneralConfig, category: str):
+def load_tensors_from_hdf5(GeneralConfig: Any, category: str):
     """Load saved tensors to quickly run an emulator training session."""
     dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
-        dataset = f["dataset"][:]
-        indices = f["indices"][:]
+        dataset = f["dataset"][:]  # type: ignore
+        indices = f["indices"][:]  # type: ignore
     dataset = torch.from_numpy(dataset).float()
     indices = torch.from_numpy(indices).int()
     return dataset, indices
@@ -201,8 +204,8 @@ def collate_function(batch):
 
 
 def tensor_to_dataloader(
-    training_config,
-    torchDataset: Dataset,
+    training_config: Any,
+    torchDataset: AutoencoderDataset | EmulatorSequenceDataset,
 ):
     """Create a DataLoader for the given Torch Dataset."""
     data_size = len(torchDataset)

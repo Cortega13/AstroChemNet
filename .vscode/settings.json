@@ -48,7 +48,6 @@
   // ✅ Enable the overview ruler & minimap markers
   "editor.minimap.enabled": true,
   "editor.overviewRulerBorder": true,
-  "editor.overviewRulerLanes": 3,
   "problems.decorations.enabled": true,
   "problems.autoReveal": true,
 
@@ -65,7 +64,6 @@
 
   // --- IntelliSense speed ---
   "python.analysis.completeFunctionParens": true,
-  "python.analysis.memory.keepLibraryAst": false,
 
   // --- Auto-import and fixes ---
   "editor.codeActionsOnSave": {

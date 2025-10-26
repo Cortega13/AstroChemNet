@@ -1,7 +1,3 @@
-import numpy as np
-import torch
-
-
 def rename_columns(columns):
     """Renames column names containing chemical species using substring replacement."""
     name_mapping = {
@@ -42,27 +38,3 @@ def rename_columns(columns):
         new_columns.append(new_col)
 
     return new_columns
-
-
-def convertUCLCHEMbaseAvtoAv(
-    physical_parameters: np.array,
-):
-    """This conversion is used internally in UCLCHEM. Our dataset has Av, although the dataset was generated using baseAv."""
-    baseAv_idx = 2
-    density_idx = 0
-    multiplier = 0.0000964375
-    additive = np.multiply(multiplier, physical_parameters[:, density_idx])
-    np.add(
-        physical_parameters[:, baseAv_idx],
-        additive,
-        out=physical_parameters[:, baseAv_idx],
-    )
-
-
-def reconstruct_emulated_outputs(encoded_inputs, emulated_outputs):
-    """Adds the time and physical parameter columns to the latent components."""
-    num_physical_parameters = DatasetConfig.num_physical_parameters
-    reconstructed_emulated_outputs = torch.cat(
-        (encoded_inputs[:, : 1 + num_physical_parameters], emulated_outputs), dim=1
-    )
-    return reconstructed_emulated_outputs

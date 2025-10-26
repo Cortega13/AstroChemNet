@@ -1,3 +1,5 @@
+"""Defines the Autoencoder and loading it."""
+
 import os
 
 import torch
@@ -6,6 +8,8 @@ import torch.nn.functional as F
 
 
 class Autoencoder(nn.Module):
+    """Autoencoder model for dimensionality reduction."""
+
     def __init__(
         self,
         input_dim=333,
@@ -36,6 +40,7 @@ class Autoencoder(nn.Module):
         self.noise = noise
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Encodes the input into the latent space."""
         x = self.activation(self.encoder_bn1(self.encoder_fc1(x)))
         x = self.activation(self.encoder_bn2(self.encoder_fc2(x)))
         x = self.dropout(x)
@@ -43,6 +48,7 @@ class Autoencoder(nn.Module):
         return z
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
+        """Decodes the latent representation back to the input space."""
         z = F.linear(z, self.encoder_fc3.weight.t()) + self.decoder_bias1
         z = self.activation(self.decoder_bn1(z))
 
@@ -55,6 +61,7 @@ class Autoencoder(nn.Module):
         return x_reconstructed
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Performs a forward pass through the autoencoder."""
         z = self.encode(x)
         if self.training and self.noise > 0:
             noise = torch.randn_like(z) * self.noise
@@ -64,19 +71,22 @@ class Autoencoder(nn.Module):
 
 
 def load_autoencoder(
-    Autoencoder: type[Autoencoder], GeneralConfig, AEConfig, inference=False
+    Autoencoder: type[Autoencoder], GeneralConfig, model_config, inference=False
 ):
+    """Loads the autoencoder model with the given configuration."""
     autoencoder = Autoencoder(
-        input_dim=AEConfig.input_dim,
-        latent_dim=AEConfig.latent_dim,
-        hidden_dims=AEConfig.hidden_dims,
-        noise=AEConfig.noise,
-        dropout=AEConfig.dropout,
+        input_dim=model_config.input_dim,
+        latent_dim=model_config.latent_dim,
+        hidden_dims=model_config.hidden_dims,
+        noise=model_config.noise,
+        dropout=model_config.dropout,
     ).to(GeneralConfig.device)
-    if os.path.exists(AEConfig.pretrained_model_path):
+    if os.path.exists(model_config.pretrained_model_path):
         print("Loading Pretrained Model")
         autoencoder.load_state_dict(
-            torch.load(AEConfig.pretrained_model_path, map_location=torch.device("cpu"))
+            torch.load(
+                model_config.pretrained_model_path, map_location=torch.device("cpu")
+            )
         )
 
     if inference:

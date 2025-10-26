@@ -1,5 +1,4 @@
-"""
-For simplicity, here we define an Inference script which"""
+"""For simplicity, here we define an Inference script which"""
 
 import numpy as np
 import torch

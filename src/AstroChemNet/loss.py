@@ -68,10 +68,7 @@ class Loss:
         targets: torch.Tensor,
         alpha: float = 2,
     ):
-        """This is the custom loss function for the autoencoder.
-        It's a combination of the reconstruction loss, conservation loss,
-        and a penalty on the worst-performing species.
-        """
+        """Custom loss function for the autoencoder."""
         mean_loss, worst_loss = self.elementwise_loss(
             outputs, targets, self.exponential, self.power_weight
         )

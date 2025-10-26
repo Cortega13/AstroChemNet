@@ -1,11 +1,8 @@
 """Hydra configuration schemas using structured configs."""
 
-import os
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
-import torch
 from hydra.core.config_store import ConfigStore
 
 
@@ -104,7 +101,9 @@ class Config:
 
     dataset: DatasetConfig
     model: ModelsConfig
-    autoencoder: ModelsConfig | None = None  # Optional second model (for emulator training)
+    autoencoder: ModelsConfig | None = (
+        None  # Optional second model (for emulator training)
+    )
 
     def __post_init__(self) -> None:
         """Setup model columns based on dataset."""
