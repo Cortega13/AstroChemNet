@@ -26,19 +26,17 @@ def setup_config(cfg: DictConfig) -> None:
     cfg.dataset.num_phys = len(cfg.dataset.phys)
     cfg.dataset.num_species = len(cfg.dataset.species)
 
-    if cfg.dataset.device == "cuda" and not torch.cuda.is_available():
-        cfg.dataset.device = "cpu"
+    if cfg.device == "cuda" and not torch.cuda.is_available():
+        cfg.device = "cpu"
 
-    # Compute model columns based on model type
-    if cfg.model.model_name == "autoencoder":
-        cfg.model.columns = cfg.dataset.species
-    elif cfg.model.model_name == "emulator":
-        cfg.model.columns = (
-            cfg.dataset.metadata + cfg.dataset.phys + cfg.dataset.species
-        )
-    else:
-        cfg.model.columns = []
+    # Compute autoencoder columns
+    cfg.autoencoder.columns = cfg.dataset.species
+    cfg.autoencoder.num_columns = len(cfg.autoencoder.columns)
 
+    # Compute emulator columns
+    cfg.model.columns = (
+        cfg.dataset.metadata + cfg.dataset.phys + cfg.dataset.species
+    )
     cfg.model.num_columns = len(cfg.model.columns)
 
 
@@ -53,56 +51,56 @@ def main(cfg: DictConfig) -> None:
     setup_config(cfg)
     OmegaConf.set_struct(cfg, True)
 
-    print(f"Device: {cfg.dataset.device}")
+    print(f"Device: {cfg.device}")
 
-    processing_functions = dp.Processing(cfg.dataset, cfg.autoencoder)
-    autoencoder = load_autoencoder(Autoencoder, cfg.dataset, cfg.autoencoder, inference=True)
-    inference_functions = Inference(cfg.dataset, processing_functions, autoencoder)
+    processing_functions = dp.Processing(cfg, cfg.autoencoder)
+    autoencoder = load_autoencoder(Autoencoder, cfg, cfg.autoencoder, inference=True)
+    inference_functions = Inference(cfg, processing_functions, autoencoder)
 
-    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
+    training_np, validation_np = dl.load_datasets(cfg, cfg.model.columns)
     training_dataset = dp.preprocessing_emulator_dataset(
-        cfg.dataset, cfg.model, training_np, processing_functions, inference_functions
+        cfg, cfg.model, training_np, processing_functions, inference_functions
     )
     validation_dataset = dp.preprocessing_emulator_dataset(
-        cfg.dataset,
+        cfg,
         cfg.model,
         validation_np,
         processing_functions,
         inference_functions,
     )
 
-    dl.save_tensors_to_hdf5(cfg.dataset, training_dataset, category="training_seq")
-    dl.save_tensors_to_hdf5(cfg.dataset, validation_dataset, category="validation_seq")
+    dl.save_tensors_to_hdf5(cfg, training_dataset, category="training_seq")
+    dl.save_tensors_to_hdf5(cfg, validation_dataset, category="validation_seq")
 
     # training_dataset, training_indices = dl.load_tensors_from_hdf5(
-    #     cfg.dataset, category="training_seq"
+    #     cfg, category="training_seq"
     # )
     # validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
-    #     cfg.dataset, category="validation_seq"
+    #     cfg, category="validation_seq"
     # )
 
     # training_Dataset = dl.EmulatorSequenceDataset(
-    #     cfg.dataset, cfg.model, training_dataset, training_indices
+    #     cfg, cfg.model, training_dataset, training_indices
     # )
     # validation_Dataset = dl.EmulatorSequenceDataset(
-    #     cfg.dataset, cfg.model, validation_dataset, validation_indices
+    #     cfg, cfg.model, validation_dataset, validation_indices
     # )
     # del training_dataset, validation_dataset, training_indices, validation_indices
 
     # training_dataloader = dl.tensor_to_dataloader(cfg.model, training_Dataset)
     # validation_dataloader = dl.tensor_to_dataloader(cfg.model, validation_Dataset)
 
-    # emulator = load_emulator(Emulator, cfg.dataset, cfg.model)
+    # emulator = load_emulator(Emulator, cfg, cfg.model)
     # optimizer, scheduler = load_objects(emulator, cfg.model)
 
     # loss_functions = Loss(
     #     processing_functions,
-    #     cfg.dataset,
+    #     cfg,
     #     ModelConfig=cfg.model,
     # )
     # emulator_trainer = EmulatorTrainerSequential(
-    #     cfg.dataset,
-    #     cfg.model,
+    #     cfg,
+    #     cfg.autoencoder,
     #     cfg.model,
     #     loss_functions,
     #     processing_functions,

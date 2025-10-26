@@ -25,8 +25,8 @@ def setup_config(cfg: DictConfig) -> None:
     cfg.dataset.num_phys = len(cfg.dataset.phys)
     cfg.dataset.num_species = len(cfg.dataset.species)
 
-    if cfg.dataset.device == "cuda" and not torch.cuda.is_available():
-        cfg.dataset.device = "cpu"
+    if cfg.device == "cuda" and not torch.cuda.is_available():
+        cfg.device = "cpu"
 
     # Compute model columns based on model type
     if cfg.model.model_name == "autoencoder":
@@ -52,11 +52,11 @@ def main(cfg: DictConfig) -> None:
     setup_config(cfg)
     OmegaConf.set_struct(cfg, True)
 
-    print(f"Device: {cfg.dataset.device}")
+    print(f"Device: {cfg.device}")
 
-    processing_functions = dp.Processing(cfg.dataset, cfg.model)
+    processing_functions = dp.Processing(cfg, cfg.model)
 
-    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
+    training_np, validation_np = dl.load_datasets(cfg, cfg.model.columns)
 
     processing_functions.abundances_scaling(training_np)
     processing_functions.abundances_scaling(validation_np)
@@ -69,12 +69,12 @@ def main(cfg: DictConfig) -> None:
     training_dataloader = dl.tensor_to_dataloader(cfg.model, training_Dataset)
     validation_dataloader = dl.tensor_to_dataloader(cfg.model, validation_Dataset)
 
-    autoencoder = load_autoencoder(Autoencoder, cfg.dataset, cfg.model)
+    autoencoder = load_autoencoder(Autoencoder, cfg, cfg.model)
     optimizer, scheduler = load_objects(autoencoder, cfg.model)
-    loss_functions = Loss(processing_functions, cfg.dataset, ModelConfig=cfg.model)
+    loss_functions = Loss(processing_functions, cfg, ModelConfig=cfg.model)
 
     autoencoder_trainer = AutoencoderTrainer(
-        cfg.dataset,
+        cfg,
         cfg.model,
         loss_functions,
         autoencoder,
@@ -87,7 +87,7 @@ def main(cfg: DictConfig) -> None:
     autoencoder_trainer.train()
 
     total_dataset = torch.vstack((training_dataset, validation_dataset))
-    inference_functions = Inference(cfg.dataset, processing_functions, autoencoder)
+    inference_functions = Inference(cfg, processing_functions, autoencoder)
     processing_functions.save_latents_minmax(
         cfg.model, total_dataset, inference_functions
     )

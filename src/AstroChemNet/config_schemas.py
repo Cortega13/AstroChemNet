@@ -13,18 +13,15 @@ from hydra.core.config_store import ConfigStore
 class DatasetConfig:
     """Dataset configuration including paths, physical parameters, and species."""
 
-    working_path: str
     dataset_path: str
     physical_parameter_ranges: dict[str, tuple[float, float]]
     abundances_lower_clipping: float
     abundances_upper_clipping: float
-    initial_abundances_path: str
-    stoichiometric_matrix_path: str
-    molecular_matrix_path: str
     metadata: list[str]
     phys: list[str]
+    initial_abundances_path: str
+    stoichiometric_matrix_path: str
     species_path: str
-    device: str = "cuda"
 
     # Computed fields populated in __post_init__
     initial_abundances: np.ndarray = field(init=False, repr=False)
@@ -45,9 +42,6 @@ class DatasetConfig:
         self.num_metadata = len(self.metadata)
         self.num_phys = len(self.phys)
         self.num_species = len(self.species)
-
-        if self.device == "cuda" and not torch.cuda.is_available():
-            self.device = "cpu"
 
 
 @dataclass

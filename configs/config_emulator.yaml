@@ -1,6 +1,7 @@
 defaults:
   - datasets: grav
-  - models: autoencoder
+  - models@autoencoder: autoencoder
+  - models@model: emulator
   - _self_
 
 working_path: ${oc.env:PWD}
