@@ -1,0 +1,7 @@
+defaults:
+  - datasets: grav
+  - models: autoencoder
+  - _self_
+
+# Global variables
+working_path: ${oc.env:PWD}

@@ -1,35 +1,62 @@
 """Script to train an autoencoder."""
 
+import hydra
+import numpy as np
 import torch
+from omegaconf import DictConfig, OmegaConf
 
 from AstroChemNet import data_loading as dl
 from AstroChemNet import data_processing as dp
+from AstroChemNet.config_schemas import Config
 from AstroChemNet.inference import Inference
 from AstroChemNet.loss import Loss
 from AstroChemNet.trainer import AutoencoderTrainer, load_objects
-from configs.autoencoder import AEConfig
-from configs.general import GeneralConfig
 from nn_architectures.autoencoder import Autoencoder, load_autoencoder
 
 
-def main(
-    Autoencoder: type[Autoencoder],
-    GeneralConfig: type[GeneralConfig],
-    AEConfig: type[AEConfig],
-):
-    """Main _summary_.
+def setup_config(cfg: DictConfig) -> None:
+    """Add computed fields to config."""
+    cfg.dataset.initial_abundances = np.load(cfg.dataset.initial_abundances_path)
+    cfg.dataset.stoichiometric_matrix = np.load(cfg.dataset.stoichiometric_matrix_path)
+    cfg.dataset.species = np.loadtxt(
+        cfg.dataset.species_path, dtype=str, delimiter=" ", comments=None
+    ).tolist()
+    cfg.dataset.num_metadata = len(cfg.dataset.metadata)
+    cfg.dataset.num_phys = len(cfg.dataset.phys)
+    cfg.dataset.num_species = len(cfg.dataset.species)
+
+    if cfg.dataset.device == "cuda" and not torch.cuda.is_available():
+        cfg.dataset.device = "cpu"
+
+    # Compute model columns based on model type
+    if cfg.model.model_name == "autoencoder":
+        cfg.model.columns = cfg.dataset.species
+    elif cfg.model.model_name == "emulator":
+        cfg.model.columns = (
+            cfg.dataset.metadata + cfg.dataset.phys + cfg.dataset.species
+        )
+    else:
+        cfg.model.columns = []
+
+    cfg.model.num_columns = len(cfg.model.columns)
+
+
+@hydra.main(config_path="../../configs", config_name="config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    """Main training function for autoencoder.
 
     Args:
-        Autoencoder (type[Autoencoder]): nn.module of Autoencoder
-        GeneralConfig (type[GeneralConfig]): ConfigurationFile
-        AEConfig (type[AEConfig]): Autoencoder-specific configuration file.
+        cfg: Hydra configuration object
     """
-    processing_functions = dp.Processing(GeneralConfig, AEConfig)
+    OmegaConf.set_struct(cfg, False)
+    setup_config(cfg)
+    OmegaConf.set_struct(cfg, True)
 
-    # stoichiometric_matrix = processing_functions.save_stoichiometric_matrix()
-    # print(f"Stochiometry Matrix: {stoichiometric_matrix} | Shape: {stoichiometric_matrix.shape}")
+    print(f"Device: {cfg.dataset.device}")
 
-    training_np, validation_np = dl.load_datasets(GeneralConfig, AEConfig.columns)
+    processing_functions = dp.Processing(cfg.dataset, cfg.model)
+
+    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
 
     processing_functions.abundances_scaling(training_np)
     processing_functions.abundances_scaling(validation_np)
@@ -39,20 +66,16 @@ def main(
     training_Dataset = dl.AutoencoderDataset(training_dataset)
     validation_Dataset = dl.AutoencoderDataset(validation_dataset)
 
-    training_dataloader = dl.tensor_to_dataloader(AEConfig, training_Dataset)
-    validation_dataloader = dl.tensor_to_dataloader(AEConfig, validation_Dataset)
+    training_dataloader = dl.tensor_to_dataloader(cfg.model, training_Dataset)
+    validation_dataloader = dl.tensor_to_dataloader(cfg.model, validation_Dataset)
 
-    autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig)
-    optimizer, scheduler = load_objects(autoencoder, AEConfig)
-    loss_functions = Loss(
-        processing_functions,
-        GeneralConfig,
-        ModelConfig=AEConfig,
-    )
+    autoencoder = load_autoencoder(Autoencoder, cfg.dataset, cfg.model)
+    optimizer, scheduler = load_objects(autoencoder, cfg.model)
+    loss_functions = Loss(processing_functions, cfg.dataset, ModelConfig=cfg.model)
 
     autoencoder_trainer = AutoencoderTrainer(
-        GeneralConfig,
-        AEConfig,
+        cfg.dataset,
+        cfg.model,
         loss_functions,
         autoencoder,
         optimizer,
@@ -64,13 +87,11 @@ def main(
     autoencoder_trainer.train()
 
     total_dataset = torch.vstack((training_dataset, validation_dataset))
-    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    inference_functions = Inference(cfg.dataset, processing_functions, autoencoder)
     processing_functions.save_latents_minmax(
-        AEConfig, total_dataset, inference_functions
+        cfg.model, total_dataset, inference_functions
     )
 
 
 if __name__ == "__main__":
-    print(f"Device: {GeneralConfig.device}")
-    # Run main script.
-    main(Autoencoder, GeneralConfig, AEConfig)
+    main()

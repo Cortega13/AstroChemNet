@@ -1,0 +1,31 @@
+# @package _global_.dataset
+
+working_path: ${working_path}
+dataset_path: ${working_path}/data/grav_collapse_clean.h5
+device: cuda
+
+physical_parameter_ranges:
+  Density: [68481, 1284211415]
+  Radfield: [1.0e-4, 26]
+  Av: [0.1, 6914]
+  gasTemp: [13, 133]
+
+abundances_lower_clipping: 1.0e-20
+abundances_upper_clipping: 1.0
+
+initial_abundances_path: ${working_path}/utils/initial_abundances.npy
+stoichiometric_matrix_path: ${working_path}/utils/stoichiometric_matrix.npy
+molecular_matrix_path: ${working_path}/utils/molecular_matrix.npy
+
+metadata:
+  - Index
+  - Model
+  - Time
+
+phys:
+  - Density
+  - Radfield
+  - Av
+  - gasTemp
+
+species_path: ${working_path}/utils/species.txt

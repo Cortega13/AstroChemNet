@@ -27,7 +27,13 @@ python scripts/train/train_autoencoder.py
 
 Train the emulator (requires pretrained autoencoder):
 ```bash
-python scripts/train/train_emulator.py
+python scripts/train/train_emulator.py model=emulator
+```
+
+Override config parameters from command line:
+```bash
+python scripts/train/train_autoencoder.py model.lr=1e-4 model.batch_size=32768
+python scripts/train/train_emulator.py dataset=grav model=emulator model.hidden_dim=256
 ```
 
 ### Code Quality
@@ -63,12 +69,52 @@ The system uses a decoupled approach where the autoencoder learns to compress/de
 
 ### Configuration System
 
-Three configuration classes in `configs/`:
-- `general.py` - Dataset paths, physical parameter ranges, device settings, species lists
-- `autoencoder.py` - Architecture hyperparameters for autoencoder
-- `emulator.py` - Architecture hyperparameters for emulator
+**Uses Hydra for configuration management** with structured YAML configs and CLI overrides.
 
-All configs are Python classes (not dataclasses), accessed as class attributes.
+#### Configuration Structure
+
+```
+configs/
+├── config.yaml              # Main config with defaults
+├── datasets/
+│   └── grav.yaml           # Dataset config (physical params, paths, species)
+└── models/
+    ├── autoencoder.yaml    # Autoencoder hyperparameters
+    └── emulator.yaml       # Emulator hyperparameters
+```
+
+#### Structured Config Schemas
+
+Defined in `src/AstroChemNet/config_schemas.py`:
+
+- **DatasetConfig** - Dataset paths, physical parameter ranges, device settings, species lists (replaces old `GeneralConfig`)
+- **ModelsConfig** - Single reusable model schema for both autoencoder and emulator; uses `Optional` fields for model-specific parameters
+- **Config** - Top-level composition of `dataset` and `model` configs
+
+#### Config Access Pattern
+
+Training scripts receive OmegaConf DictConfig objects:
+```python
+@hydra.main(config_path="../../configs", config_name="config", version_base=None)
+def main(cfg: DictConfig):
+    device = cfg.dataset.device
+    lr = cfg.model.lr
+    batch_size = cfg.model.batch_size
+```
+
+Computed fields (e.g., `num_species`, loaded numpy arrays) are added via `setup_config()` helper in training scripts.
+
+#### CLI Overrides
+
+Override any config value from command line:
+```bash
+python train_autoencoder.py model.lr=5e-4 model.dropout=0.2
+python train_emulator.py dataset=grav model=emulator model.window_size=128
+```
+
+#### Legacy Config Classes (Deprecated)
+
+Old Python class-based configs in `configs/{general,autoencoder,emulator}.py` are deprecated. They emit warnings pointing to Hydra configs. Will be removed in future version.
 
 ### Data Flow
 
@@ -118,7 +164,7 @@ Specialized trainers:
 
 ### Physical Parameters
 
-The model tracks 4 physical parameters (from `configs/general.py`):
+The model tracks 4 physical parameters (defined in `configs/datasets/grav.yaml`):
 - Density: H nuclei per cm³
 - Radfield: Habing field (radiation field strength)
 - Av: Visual extinction in magnitudes
@@ -190,10 +236,15 @@ The `requirements.txt` file appears to have encoding issues. Expected dependenci
 
 ### Training a New Model
 
-1. Ensure dataset exists at path specified in `configs/general.py`
-2. Configure hyperparameters in `configs/autoencoder.py` or `configs/emulator.py`
+1. Ensure dataset exists at path specified in `configs/datasets/grav.yaml`
+2. Configure hyperparameters by editing YAML files in `configs/models/` or via CLI overrides
 3. Train autoencoder first: `python scripts/train/train_autoencoder.py`
-4. After autoencoder converges, train emulator: `python scripts/train/train_emulator.py`
+4. After autoencoder converges, train emulator: `python scripts/train/train_emulator.py model=emulator`
+
+Example with hyperparameter tuning:
+```bash
+python scripts/train/train_autoencoder.py model.lr=5e-4 model.dropout=0.25 model.batch_size=32768
+```
 
 ### Evaluating Models
 
@@ -202,9 +253,21 @@ Use `src/AstroChemNet/inference.py` which provides the `Inference` class for:
 - Decoding latent representations to abundances
 - Running emulator predictions
 
+### Adding New Datasets
+
+1. Create new YAML file in `configs/datasets/` (e.g., `turbulent.yaml`)
+2. Define dataset path, physical parameter ranges, and species list
+3. Train with: `python scripts/train/train_autoencoder.py dataset=turbulent`
+
+### Adding New Model Variants
+
+1. Create new YAML file in `configs/models/` (e.g., `autoencoder_large.yaml`)
+2. Define architecture and hyperparameters (reuses `ModelsConfig` schema)
+3. Train with: `python scripts/train/train_autoencoder.py model=autoencoder_large`
+
 ### Adding New Species or Physical Parameters
 
-1. Update `configs/general.py` with new parameter ranges/species list
+1. Update dataset YAML in `configs/datasets/` with new parameter ranges/species path
 2. Regenerate `utils/stoichiometric_matrix.npy` if species changed
-3. Update dataset loading to include new columns
-4. Adjust model input/output dimensions in config files
+3. Update `input_dim` in model YAML to match new dimensions
+4. Hydra will handle config composition automatically
