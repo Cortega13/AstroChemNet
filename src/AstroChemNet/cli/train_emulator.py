@@ -164,7 +164,14 @@ def setup_training_components(cfg: DictConfig):
     # Initialize loss functions
     loss_functions = Loss(processing_functions, cfg.dataset, ModelConfig=cfg.model)
 
-    return autoencoder, emulator, optimizer, scheduler, processing_functions, loss_functions
+    return (
+        autoencoder,
+        emulator,
+        optimizer,
+        scheduler,
+        processing_functions,
+        loss_functions,
+    )
 
 
 def train_emulator_model(cfg: DictConfig):
@@ -178,9 +185,14 @@ def train_emulator_model(cfg: DictConfig):
     training_dataloader, validation_dataloader = load_data_and_create_dataloaders(cfg)
 
     # Setup training components
-    autoencoder, emulator, optimizer, scheduler, processing_functions, loss_functions = (
-        setup_training_components(cfg)
-    )
+    (
+        autoencoder,
+        emulator,
+        optimizer,
+        scheduler,
+        processing_functions,
+        loss_functions,
+    ) = setup_training_components(cfg)
 
     # Initialize and run trainer
     print("\nInitializing trainer...")
@@ -196,6 +208,7 @@ def train_emulator_model(cfg: DictConfig):
         scheduler,
         training_dataloader,
         validation_dataloader,
+        cfg.device,
     )
 
     print("\nStarting training...")
@@ -205,7 +218,9 @@ def train_emulator_model(cfg: DictConfig):
     print("\nTraining complete!")
 
 
-@hydra.main(config_path="../../../configs", config_name="config_emulator", version_base=None)
+@hydra.main(
+    config_path="../../../configs", config_name="config_emulator", version_base=None
+)
 def main(cfg: DictConfig):
     """Main entry point for emulator training CLI command.
 
@@ -227,7 +242,9 @@ def main(cfg: DictConfig):
         preprocess_emulator_data(cfg)
         train_emulator_model(cfg)
     else:
-        raise ValueError(f"Invalid mode: {mode}. Must be 'preprocess', 'train', or 'both'.")
+        raise ValueError(
+            f"Invalid mode: {mode}. Must be 'preprocess', 'train', or 'both'."
+        )
 
 
 if __name__ == "__main__":

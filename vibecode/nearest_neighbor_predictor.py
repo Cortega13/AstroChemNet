@@ -10,23 +10,59 @@ import sys
 from collections import defaultdict
 
 import numpy as np
+from hydra import compose, initialize_config_dir
+from omegaconf import OmegaConf
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
+
+sys.path.append(os.path.abspath(".."))
+import AstroChemNet.data_loading as dl
+
+
+def load_config():
+    """Load Hydra configuration for emulator."""
+    # Get the directory containing this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Navigate to the configs directory at the project root
+    config_dir = os.path.join(script_dir, "..", "configs")
+    config_dir = os.path.abspath(config_dir)
+
+    with initialize_config_dir(config_dir=config_dir, version_base=None):
+        cfg = compose(config_name="config", overrides=["models=emulator"])
+
+        # Disable struct mode to allow adding computed fields
+        OmegaConf.set_struct(cfg, False)
+
+        # Manually load computed fields (compose doesn't call __post_init__)
+        # Load species from file
+        species_path = cfg.dataset.species_path.replace("${working_path}", os.path.abspath(".."))
+        cfg.dataset.species = np.loadtxt(
+            species_path, dtype=str, delimiter=" ", comments=None
+        ).tolist()
+        cfg.dataset.num_species = len(cfg.dataset.species)
+
+        # Load other computed fields
+        cfg.dataset.num_metadata = len(cfg.dataset.metadata)
+        cfg.dataset.num_phys = len(cfg.dataset.phys)
+
+        # Setup columns for model
+        if cfg.model.model_name == "emulator":
+            cfg.model.columns = cfg.dataset.metadata + cfg.dataset.phys + cfg.dataset.species
+        else:
+            cfg.model.columns = cfg.dataset.species
+        cfg.model.num_columns = len(cfg.model.columns)
+
+        # Re-enable struct mode
+        OmegaConf.set_struct(cfg, True)
+    return cfg
 
 
 def load_datasets():
     """Load combined training and validation datasets."""
-    sys.path.append(os.path.abspath(".."))
-    import AstroChemNet.data_loading as dl
-    from configs.emulator import EMConfig
-    from configs.general import GeneralConfig
-
-    general_config = GeneralConfig()
-    em_config = EMConfig()
-
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
+    cfg = load_config()
+    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
     data_np = np.concatenate([training_np, validation_np], axis=0)
-    return data_np, general_config
+    return data_np, cfg.dataset
 
 
 def load_indices():
@@ -40,7 +76,7 @@ def load_indices():
     return training_indices, validation_indices
 
 
-def extract_trajectories_by_model(dataset, general_config):
+def extract_trajectories_by_model(dataset, dataset_config):
     """Extract trajectories grouped by model ID."""
     unique_models = np.unique(dataset[:, 1])
     model_trajectories = {}
@@ -50,7 +86,7 @@ def extract_trajectories_by_model(dataset, general_config):
         mask = dataset[:, 1] == model
         subset = dataset[mask]
 
-        data = subset[:, -general_config.num_species :].copy()
+        data = subset[:, -dataset_config.num_species :].copy()
         model_trajectories[model] = data
         model_log_trajectories[model] = np.log10(data + 1e-20)
 
@@ -215,11 +251,11 @@ def main():
     """Main function to run the nearest neighbor prediction pipeline."""
     print("Starting Nearest Neighbor Prediction Pipeline...")
 
-    data_np, general_config = load_datasets()
+    data_np, dataset_config = load_datasets()
     training_indices, validation_indices = load_indices()
 
     trajectories, log_trajectories = extract_trajectories_by_model(
-        data_np, general_config
+        data_np, dataset_config
     )
 
     training_pca, training_sequences, model_list, pca = build_training_vector_database(

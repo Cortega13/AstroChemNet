@@ -29,6 +29,20 @@ import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
+from ..utils import rename_columns
+
+
+def load_initial_abundances(cfg: DictConfig, species: np.ndarray):
+    """Loads initial abundances with uninitialized information."""
+    initial_abundances = np.load(cfg.dataset.initial_abundances_path)
+    df_init = pd.DataFrame(initial_abundances, columns=species)
+    df_init["Radfield"] = 0
+    df_init["Time"] = 0
+    df_init["Av"] = 0
+    df_init["gasTemp"] = 0
+    df_init["Density"] = 0
+    return df_init
+
 
 def preprocess_dataset(cfg: DictConfig):
     """Preprocess raw UCLCHEM data into cleaned HDF5 format.
@@ -41,13 +55,18 @@ def preprocess_dataset(cfg: DictConfig):
     print("=" * 80)
     print(f"\nConfiguration:\n{OmegaConf.to_yaml(cfg)}")
 
+    # Load species list
+    species = np.loadtxt(
+        cfg.dataset.species_path, dtype=str, delimiter=" ", comments=None
+    ).tolist()
+
     # Load raw data
     print(f"\nLoading raw data from {cfg.input_path}...")
-    if not os.path.exists(cfg.input_path):
-        raise FileNotFoundError(f"Input file not found: {cfg.input_path}")
-
     df = pd.read_hdf(cfg.input_path, key=cfg.input_key)
     print(f"Loaded {len(df)} rows with {len(df.columns)} columns")
+
+    # Rename columns
+    df.columns = rename_columns(df.columns)
 
     # Drop unwanted columns
     if cfg.columns_to_drop:
@@ -55,50 +74,58 @@ def preprocess_dataset(cfg: DictConfig):
         df = df.drop(columns=cfg.columns_to_drop, errors="ignore")
         print(f"Remaining columns: {len(df.columns)}")
 
-    # Filter physical parameters
+    # Set minimum radfield. Radfield goes several orders of magnitude lower than 1e-4, but I suspect this has little effect on abundances.
     if hasattr(cfg, "min_radfield"):
-        print(f"\nFiltering Radfield >= {cfg.min_radfield}")
-        initial_len = len(df)
-        df = df[df["Radfield"] >= cfg.min_radfield]
-        print(f"Filtered {initial_len - len(df)} rows, {len(df)} remaining")
+        print(f"Setting Minimum Radfield to {cfg.min_radfield}")
+        df["Radfield"] = np.maximum(df["Radfield"], cfg.min_radfield)
+
+    # Load initial abundances.
+    df_init = load_initial_abundances(cfg, species)
+
+    # Setting the first row for each trajectory to initial abundances
+    output_chunks = []
+    df.sort_values(by=["Model", "Time"], inplace=True)  # type: ignore
+    for _, tdf in df.groupby("Model", sort=False):
+        tdf = tdf.reset_index(drop=True)
+
+        df_init["Model"] = tdf.iloc[0]["Model"]
+
+        tdf = pd.concat([df_init, tdf], ignore_index=True)
+
+        physical = tdf[cfg.dataset.phys].shift(-1)
+        physical.iloc[-1] = physical.iloc[-2]
+
+        tdf.loc[:, cfg.dataset.phys] = physical.values
+        output_chunks.append(tdf)
+
+    # Combine all processed chunks and sort columns.
+    df = pd.concat(output_chunks, ignore_index=True)
+    df = df.sort_values(by=["Model", "Time"]).reset_index(drop=True)
+    df.insert(0, "Index", range(len(df)))
+    df = df[cfg.dataset.metadata + cfg.dataset.phys + species]
 
     # Split into train/validation
     print(f"\nSplitting data (train_split={cfg.train_split})...")
     np.random.seed(cfg.seed)
 
-    # Get unique trajectory indices
-    if "trajectory_index" in df.columns:
-        unique_trajectories = df["trajectory_index"].unique()
-        np.random.shuffle(unique_trajectories)
+    # Shuffling the tracer indices.
+    tracers = df["Model"].unique()
+    np.random.shuffle(tracers)
 
-        split_idx = int(len(unique_trajectories) * cfg.train_split)
-        train_trajectories = unique_trajectories[:split_idx]
-        val_trajectories = unique_trajectories[split_idx:]
+    # 75% train, 25% validation split based off the shuffled tracer indices.
+    split_idx = int(len(tracers) * 0.75)
 
-        train_df = df[df["trajectory_index"].isin(train_trajectories)]
-        val_df = df[df["trajectory_index"].isin(val_trajectories)]
+    train_tracers = tracers[:split_idx]
+    val_tracers = tracers[split_idx:]
 
-        print(f"Train trajectories: {len(train_trajectories)}")
-        print(f"Validation trajectories: {len(val_trajectories)}")
-    else:
-        # Simple random split if no trajectory index
-        split_idx = int(len(df) * cfg.train_split)
-        indices = np.arange(len(df))
-        np.random.shuffle(indices)
+    train_df = df[df["Model"].isin(train_tracers)]
+    val_df = df[df["Model"].isin(val_tracers)]
 
-        train_df = df.iloc[indices[:split_idx]]
-        val_df = df.iloc[indices[split_idx:]]
+    train_df = train_df.reset_index(drop=True)
+    val_df = val_df.reset_index(drop=True)
 
-    print(f"Train samples: {len(train_df)}")
-    print(f"Validation samples: {len(val_df)}")
-
-    # Save to HDF5
-    print(f"\nSaving preprocessed data to {cfg.output_path}...")
-    os.makedirs(os.path.dirname(cfg.output_path), exist_ok=True)
-
-    with pd.HDFStore(cfg.output_path, mode="w") as store:
-        store.put("train", train_df, format="table")
-        store.put("val", val_df, format="table")
+    train_df.to_hdf("data/grav_collapse_clean.h5", key="train", mode="w")
+    val_df.to_hdf("data/grav_collapse_clean.h5", key="val", mode="a")
 
     print("\nPreprocessing complete!")
     print(f"Saved to: {cfg.output_path}")

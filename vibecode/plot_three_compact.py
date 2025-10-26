@@ -5,14 +5,24 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+from hydra import compose, initialize_config_dir
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 sys.path.append(os.path.abspath(".."))
 import AstroChemNet.data_loading as dl
-from configs.autoencoder import AEConfig
-from configs.emulator import EMConfig
-from configs.general import GeneralConfig
+
+
+def load_config():
+    """Load Hydra configuration for emulator."""
+    config_dir = os.path.abspath(os.path.join("..", "configs"))
+    with initialize_config_dir(config_dir=config_dir, version_base=None):
+        cfg = compose(config_name="config", overrides=["models=emulator"])
+        # Setup columns for model
+        cfg.model.setup_columns(
+            cfg.dataset.metadata, cfg.dataset.phys, cfg.dataset.species
+        )
+    return cfg
 
 
 class CompactTSNETool:
@@ -20,16 +30,16 @@ class CompactTSNETool:
 
     def __init__(self):
         """Initialize configurations."""
-        self.general_config = GeneralConfig()
-        self.ae_config = AEConfig()
-        self.em_config = EMConfig()
+        self.cfg = load_config()
+        self.dataset_config = self.cfg.dataset
+        self.model_config = self.cfg.model
         self.tsne_data_path = "tsne_data.csv"
         self.plots_dir = "../plots/trajectories"
         os.makedirs(self.plots_dir, exist_ok=True)
 
     def load_datasets(self):
         """Load training and validation datasets."""
-        return dl.load_datasets(self.general_config, self.em_config.columns)
+        return dl.load_datasets(self.dataset_config, self.model_config.columns)
 
     def load_tsne_data(self, path):
         """Load t-SNE data from CSV file."""
@@ -54,17 +64,17 @@ class CompactTSNETool:
             mask = combined_np[:, 1] == model
             subset = combined_np[mask]
             if data_type == "species":
-                data = subset[:, -self.general_config.num_species :].copy()
+                data = subset[:, -self.dataset_config.num_species :].copy()
                 processed = np.log10(data + 1e-20).flatten()
             else:
                 data = subset[
                     :,
-                    self.general_config.num_metadata : self.general_config.num_metadata
-                    + self.general_config.num_phys,
+                    self.dataset_config.num_metadata : self.dataset_config.num_metadata
+                    + self.dataset_config.num_phys,
                 ].copy()
                 processed = data.flatten()
             trajectories.append(processed)
-            final_density = subset[-1, self.general_config.num_metadata]
+            final_density = subset[-1, self.dataset_config.num_metadata]
             log_densities.append(np.log10(final_density))
         return np.array(trajectories), log_densities
 

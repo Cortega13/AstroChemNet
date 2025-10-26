@@ -1,6 +1,7 @@
 """Hydra configuration schemas using structured configs."""
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from hydra.core.config_store import ConfigStore
@@ -11,7 +12,7 @@ class DatasetConfig:
     """Dataset configuration including paths, physical parameters, and species."""
 
     dataset_path: str
-    physical_parameter_ranges: dict[str, tuple[float, float]]
+    physical_parameter_ranges: dict[str, list[float]]
     abundances_lower_clipping: float
     abundances_upper_clipping: float
     metadata: list[str]
@@ -21,12 +22,12 @@ class DatasetConfig:
     species_path: str
 
     # Computed fields populated in __post_init__
-    initial_abundances: np.ndarray = field(init=False, repr=False)
-    stoichiometric_matrix: np.ndarray = field(init=False, repr=False)
-    species: list[str] = field(init=False, repr=False)
-    num_metadata: int = field(init=False, repr=False)
-    num_phys: int = field(init=False, repr=False)
-    num_species: int = field(init=False, repr=False)
+    initial_abundances: Any = field(init=False, repr=False, default=None)
+    stoichiometric_matrix: Any = field(init=False, repr=False, default=None)
+    species: Any = field(init=False, repr=False, default=None)
+    num_metadata: Any = field(init=False, repr=False, default=None)
+    num_phys: Any = field(init=False, repr=False, default=None)
+    num_species: Any = field(init=False, repr=False, default=None)
 
     def __post_init__(self) -> None:
         """Load arrays and compute derived fields."""
@@ -50,7 +51,7 @@ class ModelsConfig:
     lr: float
     lr_decay: float
     lr_decay_patience: int
-    betas: tuple[float, float]
+    betas: list[float]
     weight_decay: float
     power_weight: float
     conservation_weight: float
@@ -68,7 +69,7 @@ class ModelsConfig:
     # Optional architecture parameters
     output_dim: int | None = None
     hidden_dim: int | None = None
-    hidden_dims: tuple[int, ...] | None = None
+    hidden_dims: list[int] | None = None
     latent_dim: int | None = None
     window_size: int | None = None
 

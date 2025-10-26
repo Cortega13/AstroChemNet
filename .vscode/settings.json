@@ -79,5 +79,11 @@
   "autoDocstring.generateDocstringOnEnter": true,
   "autoDocstring.startOnNewLine": true,
   "autoDocstring.includeName": true,
-  "autoDocstring.includeExtendedSummary": false
+  "autoDocstring.includeExtendedSummary": false,
+
+  "notebook.formatOnSave.enabled": true,
+  "notebook.codeActionsOnSave": {
+    "notebook.source.fixAll": "explicit",
+    "notebook.source.organizeImports": "explicit"
+
 }

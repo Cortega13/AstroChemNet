@@ -6,7 +6,7 @@ working_path: ${oc.env:PWD}
 
 # Preprocessing parameters
 input_path: ${working_path}/data/gravitational_collapse.h5
-output_path: ${working_path}/data/grav_collapse_clean.h5
+output_path: ${working_path}/outputs/temp_data/grav_collapse_clean.h5
 input_key: df
 
 # Columns to drop from raw data

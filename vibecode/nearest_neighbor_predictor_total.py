@@ -10,25 +10,34 @@ import sys
 from collections import defaultdict
 
 import numpy as np
+from hydra import compose, initialize_config_dir
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
+
+sys.path.append(os.path.abspath(".."))
+import AstroChemNet.data_loading as dl
+
+
+def load_config():
+    """Load Hydra configuration for emulator."""
+    config_dir = os.path.abspath(os.path.join("..", "configs"))
+    with initialize_config_dir(config_dir=config_dir, version_base=None):
+        cfg = compose(config_name="config", overrides=["models=emulator"])
+        # Setup columns for model
+        cfg.model.setup_columns(
+            cfg.dataset.metadata, cfg.dataset.phys, cfg.dataset.species
+        )
+    return cfg
 
 
 def load_datasets():
     """Load training and validation datasets."""
-    sys.path.append(os.path.abspath(".."))
-    import AstroChemNet.data_loading as dl
-    from configs.emulator import EMConfig
-    from configs.general import GeneralConfig
-
-    general_config = GeneralConfig()
-    em_config = EMConfig()
-
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
-    return training_np, validation_np, general_config
+    cfg = load_config()
+    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
+    return training_np, validation_np, cfg.dataset
 
 
-def extract_trajectories_by_model(dataset, general_config):
+def extract_trajectories_by_model(dataset, dataset_config):
     """Extract trajectories grouped by model ID."""
     unique_models = np.unique(dataset[:, 1])
     model_trajectories = {}
@@ -41,18 +50,18 @@ def extract_trajectories_by_model(dataset, general_config):
         mask = dataset[:, 1] == model
         subset = dataset[mask]
 
-        data = subset[:, -general_config.num_species :].copy()
+        data = subset[:, -dataset_config.num_species :].copy()
         phys_data = subset[
             :,
-            general_config.num_metadata : general_config.num_metadata
-            + general_config.num_phys,
+            dataset_config.num_metadata : dataset_config.num_metadata
+            + dataset_config.num_phys,
         ].copy()
         model_trajectories[model] = data
         model_log_trajectories[model] = np.log10(data + 1e-20)
         model_phys_trajectories[model] = phys_data
         model_log_phys_trajectories[model] = np.log10(phys_data + 1e-20)
 
-        final_density = subset[-1, general_config.num_metadata]
+        final_density = subset[-1, dataset_config.num_metadata]
         model_log_densities[model] = np.log10(final_density + 1e-20)
 
     return (
@@ -226,20 +235,20 @@ def main():
     """Main function to run the nearest neighbor prediction pipeline."""
     print("Starting Nearest Neighbor Prediction Pipeline...")
 
-    training_np, validation_np, general_config = load_datasets()
+    training_np, validation_np, dataset_config = load_datasets()
 
     (
         training_trajectories,
         training_log_trajectories,
         training_log_phys_trajectories,
         training_log_densities,
-    ) = extract_trajectories_by_model(training_np, general_config)
+    ) = extract_trajectories_by_model(training_np, dataset_config)
     (
         validation_trajectories,
         validation_log_trajectories,
         validation_log_phys_trajectories,
         validation_log_densities,
-    ) = extract_trajectories_by_model(validation_np, general_config)
+    ) = extract_trajectories_by_model(validation_np, dataset_config)
 
     training_pca, training_sequences, model_list, pca = build_training_vector_database(
         training_log_phys_trajectories,

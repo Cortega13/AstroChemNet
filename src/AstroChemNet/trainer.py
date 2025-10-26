@@ -7,15 +7,13 @@ from datetime import datetime
 
 import numpy as np
 import torch
-from configs.autoencoder import AEConfig
-from configs.emulator import EMConfig
-from configs.general import GeneralConfig
 from torch import optim
 from torch.backends import cudnn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 import src.AstroChemNet.data_processing as dp
+from src.AstroChemNet.config_schemas import DatasetConfig, ModelsConfig
 from src.AstroChemNet.loss import Loss
 
 from .models.autoencoder import Autoencoder
@@ -30,17 +28,19 @@ torch.autograd.set_detect_anomaly(True)
 class Trainer:
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
-        model_config: AEConfig | EMConfig,
+        dataset_config: DatasetConfig,
+        model_config: ModelsConfig,
         model: Autoencoder | Emulator,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
+        device: str,
     ) -> None:
         """Initializes the Trainer class. A class which simplifies training by including all necessary components."""
-        self.device = GeneralConfig.device
+        self.device = device
         self.start_time = datetime.now()
+        self.dataset_config = dataset_config
         self.model_config = model_config
 
         self.model = model
@@ -54,7 +54,7 @@ class Trainer:
         self.current_learning_rate = self.model_config.lr
         self.best_weights = None
         self.metric_minimum_loss = np.inf
-        self.epoch_validation_loss = torch.zeros(GeneralConfig.num_species).to(
+        self.epoch_validation_loss = torch.zeros(dataset_config.num_species).to(
             self.device
         )
         self.stagnant_epochs = 0
@@ -193,34 +193,36 @@ class Trainer:
 class AutoencoderTrainer(Trainer):
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
-        AEConfig: AEConfig,
+        dataset_config: DatasetConfig,
+        model_config: ModelsConfig,
         loss_functions: Loss,
         autoencoder: Autoencoder,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
+        device: str,
     ) -> None:
         """Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder."""
-        self.num_metadata = GeneralConfig.num_metadata
-        self.num_phys = GeneralConfig.phys
-        self.num_species = GeneralConfig.num_species
-        self.num_components = AEConfig.latent_dim
-        self.gradient_clipping = AEConfig.gradient_clipping
+        self.num_metadata = dataset_config.num_metadata
+        self.num_phys = dataset_config.num_phys
+        self.num_species = dataset_config.num_species
+        self.num_components = model_config.latent_dim
+        self.gradient_clipping = model_config.gradient_clipping
 
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
 
         super().__init__(
-            GeneralConfig,
-            model_config=AEConfig,
+            dataset_config,
+            model_config=model_config,
             model=autoencoder,
             optimizer=optimizer,
             scheduler=scheduler,
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
+            device=device,
         )
 
     def _run_training_batch(self, features):
@@ -268,9 +270,9 @@ class AutoencoderTrainer(Trainer):
 class EmulatorTrainerSequential(Trainer):
     def __init__(
         self,
-        GeneralConfig,
-        AEConfig: AEConfig,
-        EMConfig: EMConfig,
+        dataset_config: DatasetConfig,
+        autoencoder_config: ModelsConfig,
+        emulator_config: ModelsConfig,
         loss_functions: Loss,
         processing_functions: dp.Processing,
         autoencoder: Autoencoder,
@@ -279,25 +281,27 @@ class EmulatorTrainerSequential(Trainer):
         scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
+        device: str,
     ) -> None:
         """Initializes the EmulatorTrainer, a subclass of Trainer, specialized for train the emulator."""
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
-        self.latent_dim = AEConfig.latent_dim
-        self.gradient_clipping = EMConfig.gradient_clipping
+        self.latent_dim = autoencoder_config.latent_dim
+        self.gradient_clipping = emulator_config.gradient_clipping
         self.inverse_latent_components_scaling = (
             processing_functions.inverse_latent_components_scaling
         )
 
         super().__init__(
-            GeneralConfig,
-            model_config=EMConfig,
+            dataset_config,
+            model_config=emulator_config,
             model=emulator,
             optimizer=optimizer,
             scheduler=scheduler,
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
+            device=device,
         )
 
     def _run_training_batch(self, phys, features, targets):

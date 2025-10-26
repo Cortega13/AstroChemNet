@@ -1,16 +1,29 @@
 """For simplicity, here we define an Inference script which"""
 
+from typing import Optional
+
 import numpy as np
 import torch
 
+from .models.autoencoder import Autoencoder
+from .models.emulator import Emulator
+
 
 class Inference:
+    """Class for performing inference using the autoencoder and emulator models."""
+
     def __init__(
-        self, GeneralConfig, processing_functions, autoencoder=None, emulator=None
+        self,
+        GeneralConfig,
+        processing_functions,
+        autoencoder: Optional[Autoencoder] = None,
+        emulator: Optional[Emulator] = None,
     ):
         self.device = GeneralConfig.device
-        self.autoencoder = autoencoder
-        self.emulator = emulator
+        if autoencoder:
+            self.autoencoder = autoencoder
+        if emulator:
+            self.emulator = emulator
 
         self.inverse_abundances_scaling = (
             processing_functions.inverse_abundances_scaling

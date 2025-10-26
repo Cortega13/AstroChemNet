@@ -27,16 +27,21 @@ def generate_tsne_data(tsne_data_path):
     """Generate t-SNE data from raw datasets."""
     # Import necessary modules for data loading
     sys.path.append(os.path.abspath(".."))
-    import AstroChemNet.data_loading as dl
-    from configs.emulator import EMConfig
-    from configs.general import GeneralConfig
+    from hydra import compose, initialize_config_dir
 
-    # Initialize configs
-    general_config = GeneralConfig()
-    em_config = EMConfig()
+    import AstroChemNet.data_loading as dl
+
+    # Load config
+    config_dir = os.path.abspath(os.path.join("..", "configs"))
+    with initialize_config_dir(config_dir=config_dir, version_base=None):
+        cfg = compose(config_name="config", overrides=["models=emulator"])
+        # Setup columns for model
+        cfg.model.setup_columns(
+            cfg.dataset.metadata, cfg.dataset.phys, cfg.dataset.species
+        )
 
     # Load datasets
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
+    training_np, validation_np = dl.load_datasets(cfg.dataset, cfg.model.columns)
     combined_np = np.concatenate([training_np, validation_np], axis=0)
     del training_np, validation_np
 
@@ -45,7 +50,7 @@ def generate_tsne_data(tsne_data_path):
 
     # Extract trajectories
     trajectories, log_densities = extract_trajectories(
-        combined_np, unique_models, general_config
+        combined_np, unique_models, cfg.dataset
     )
 
     # Apply PCA and t-SNE
@@ -67,7 +72,7 @@ def generate_tsne_data(tsne_data_path):
     return data_to_save
 
 
-def extract_trajectories(combined_np, unique_models, general_config):
+def extract_trajectories(combined_np, unique_models, dataset_config):
     """Extract and process trajectories for t-SNE."""
     trajectories = []
     log_densities = []
@@ -75,10 +80,10 @@ def extract_trajectories(combined_np, unique_models, general_config):
     for model in unique_models:
         mask = combined_np[:, 1] == model
         subset = combined_np[mask]
-        data = subset[:, -general_config.num_species :].copy()
+        data = subset[:, -dataset_config.num_species :].copy()
         processed = np.log10(data + 1e-20).flatten()
         trajectories.append(processed)
-        final_density = subset[-1, general_config.num_metadata]
+        final_density = subset[-1, dataset_config.num_metadata]
         log_densities.append(np.log10(final_density))
 
     return np.array(trajectories), log_densities

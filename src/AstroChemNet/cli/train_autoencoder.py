@@ -206,6 +206,7 @@ def train_autoencoder_model(cfg: DictConfig):
         scheduler,
         training_dataloader,
         validation_dataloader,
+        cfg.device,
     )
 
     print("\nStarting training...")
