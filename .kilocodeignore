@@ -1,0 +1,8 @@
+# Kilocodeignore
+.ruff_cache/
+__pycache__/
+*.egg-info
+*.pyc
+outouts/
+utils/
+*.ipynb

@@ -63,7 +63,7 @@ def calculate_per_species_errors(
     n_species: int = 333,
     n_params: int = 4,
 ) -> np.ndarray:
-    """Calculate MAPE for each species across all timesteps and trajectories."""
+    """Calculate MAPE for each species in unscaled abundance space."""
     n_val = len(predicted_traj)
     n_features = n_species + n_params
 
@@ -71,14 +71,18 @@ def calculate_per_species_errors(
     pred_reshaped = predicted_traj.reshape(n_val, n_timesteps, n_features)
     actual_reshaped = actual_traj.reshape(n_val, n_timesteps, n_features)
 
-    # Extract only species (first 333 columns)
-    pred_species = pred_reshaped[:, :, :n_species]
-    actual_species = actual_reshaped[:, :, :n_species]
+    # Extract only species (first 333 columns) - these are in log space
+    pred_species_log = np.clip(pred_reshaped[:, :, :n_species], -20, 0)
+    actual_species_log = np.clip(actual_reshaped[:, :, :n_species], -20, 0)
 
-    # Calculate per-species MAPE averaged over all trajectories and timesteps
+    # Convert from log space to linear space
+    pred_species = 10**pred_species_log
+    actual_species = 10**actual_species_log
+
+    # Calculate per-species MAPE in unscaled space
     species_errors = (
         np.mean(
-            np.abs((actual_species - pred_species) / (actual_species + 1e-10)),
+            np.abs((actual_species - pred_species) / (actual_species + 1e-20)),
             axis=(0, 1),
         )
         * 100
@@ -94,7 +98,7 @@ def calculate_max_element_errors(
     n_species: int = 333,
     n_params: int = 4,
 ) -> np.ndarray:
-    """Calculate maximum element-wise error for each trajectory."""
+    """Calculate maximum element-wise error for each trajectory in unscaled space."""
     n_val = len(predicted_traj)
     n_features = n_species + n_params
 
@@ -102,12 +106,20 @@ def calculate_max_element_errors(
     pred_reshaped = predicted_traj.reshape(n_val, n_timesteps, n_features)
     actual_reshaped = actual_traj.reshape(n_val, n_timesteps, n_features)
 
-    # Calculate element-wise absolute percentage error
+    # Extract species (first 333 columns) - in log space, clip to valid range
+    pred_species_log = np.clip(pred_reshaped[:, :, :n_species], -20, 0)
+    actual_species_log = np.clip(actual_reshaped[:, :, :n_species], -20, 0)
+
+    # Convert from log space to linear space for species
+    pred_species = 10**pred_species_log
+    actual_species = 10**actual_species_log
+
+    # Calculate element-wise absolute percentage error for species only
     element_errors = (
-        np.abs((actual_reshaped - pred_reshaped) / (actual_reshaped + 1e-10)) * 100
+        np.abs((actual_species - pred_species) / (actual_species + 1e-20)) * 100
     )
 
-    # Get max error across all elements (timesteps and features) for each trajectory
+    # Get max error across all elements (timesteps and species) for each trajectory
     max_errors = np.max(element_errors, axis=(1, 2))
 
     return max_errors
@@ -551,13 +563,105 @@ Top 3 Worst Species:
 3. {species_list[top_indices[2]]}: {species_errors[top_indices[2]]:.2f}%
 """
     axes[1, 1].text(
-        0.1, 0.5, stats_text, fontsize=10, verticalalignment="center", family="monospace"
+        0.1,
+        0.5,
+        stats_text,
+        fontsize=10,
+        verticalalignment="center",
+        family="monospace",
     )
 
     plt.tight_layout()
     plt.savefig(output_dir / "species_error_analysis.png", dpi=300, bbox_inches="tight")
     plt.close()
     print(f"Saved: {output_dir / 'species_error_analysis.png'}")
+
+
+def plot_mape_vs_timestep(
+    predicted_traj: np.ndarray,
+    actual_traj: np.ndarray,
+    output_dir: Path,
+    n_timesteps: int = 298,
+    n_species: int = 333,
+    n_params: int = 4,
+):
+    """Plot MAPE evolution across timesteps."""
+    n_val = len(predicted_traj)
+    n_features = n_species + n_params
+
+    # Reshape to (n_val, n_timesteps, n_features)
+    pred_reshaped = predicted_traj.reshape(n_val, n_timesteps, n_features)
+    actual_reshaped = actual_traj.reshape(n_val, n_timesteps, n_features)
+
+    # Extract species (first 333 columns) - in log space
+    pred_species_log = np.clip(pred_reshaped[:, :, :n_species], -20, 0)
+    actual_species_log = np.clip(actual_reshaped[:, :, :n_species], -20, 0)
+
+    # Convert to linear space
+    pred_species = 10**pred_species_log
+    actual_species = 10**actual_species_log
+
+    # Calculate MAPE per timestep (averaged over validation trajectories and species)
+    mape_per_timestep = (
+        np.mean(
+            np.abs((actual_species - pred_species) / (actual_species + 1e-20)),
+            axis=(0, 2),
+        )
+        * 100
+    )
+
+    # Calculate percentiles for error bands
+    errors_per_traj_timestep = (
+        np.mean(
+            np.abs((actual_species - pred_species) / (actual_species + 1e-20)), axis=2
+        )
+        * 100
+    )
+    p25 = np.percentile(errors_per_traj_timestep, 25, axis=0)
+    p75 = np.percentile(errors_per_traj_timestep, 75, axis=0)
+    p10 = np.percentile(errors_per_traj_timestep, 10, axis=0)
+    p90 = np.percentile(errors_per_traj_timestep, 90, axis=0)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Left: Linear scale
+    timesteps = np.arange(n_timesteps)
+    axes[0].plot(
+        timesteps, mape_per_timestep, linewidth=2, color="darkblue", label="Mean MAPE"
+    )
+    axes[0].fill_between(
+        timesteps, p25, p75, alpha=0.3, color="steelblue", label="25-75 percentile"
+    )
+    axes[0].fill_between(
+        timesteps, p10, p90, alpha=0.15, color="lightblue", label="10-90 percentile"
+    )
+    axes[0].set_xlabel("Timestep")
+    axes[0].set_ylabel("MAPE (%)")
+    axes[0].set_title("Prediction Error Evolution (Linear Scale)")
+    axes[0].legend()
+    axes[0].grid(alpha=0.3)
+
+    # Right: Log scale
+    axes[1].plot(
+        timesteps, mape_per_timestep, linewidth=2, color="darkred", label="Mean MAPE"
+    )
+    axes[1].fill_between(
+        timesteps, p25, p75, alpha=0.3, color="coral", label="25-75 percentile"
+    )
+    axes[1].fill_between(
+        timesteps, p10, p90, alpha=0.15, color="lightsalmon", label="10-90 percentile"
+    )
+    axes[1].set_xlabel("Timestep")
+    axes[1].set_ylabel("MAPE (%)")
+    axes[1].set_yscale("log")
+    axes[1].set_title("Prediction Error Evolution (Log Scale)")
+    axes[1].legend()
+    axes[1].grid(alpha=0.3, which="both")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "mape_vs_timestep.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {output_dir / 'mape_vs_timestep.png'}")
 
 
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
@@ -605,30 +709,49 @@ def main(cfg: DictConfig):
         neighbor_components = train_pca[indices[i]]
         predicted_pca[i] = (weights[i][:, np.newaxis] * neighbor_components).sum(axis=0)
 
-    # Calculate per-trajectory errors (MAPE)
-    predicted_traj = pca.inverse_transform(predicted_pca)
-    actual_traj = pca.inverse_transform(val_pca)
-    errors = (
-        np.mean(np.abs((actual_traj - predicted_traj) / (actual_traj + 1e-10)), axis=1)
-        * 100
-    )
+    # Calculate per-trajectory errors (MAPE) in unscaled space
+    predicted_traj_log = pca.inverse_transform(predicted_pca)
+    actual_traj_log = pca.inverse_transform(val_pca)
 
-    print(f"Mean MAPE: {errors.mean():.4f}%")
-    print(f"Median MAPE: {np.median(errors):.4f}%")
-    print(f"Max MAPE: {errors.max():.4f}%")
-
-    # Determine actual trajectory dimensions
-    n_val = len(val_pca)
-    total_features = predicted_traj.shape[1]
+    # Determine trajectory dimensions
     species_list = get_species_list(cfg)
     n_species = len(species_list)
     n_params = len(cfg.dataset.parameters)
     n_features_per_timestep = n_species + n_params
-    n_timesteps = total_features // n_features_per_timestep
+    n_timesteps = predicted_traj_log.shape[1] // n_features_per_timestep
+    n_val = len(predicted_traj_log)
 
-    print(f"\nTrajectory shape info:")
+    # Reshape to (n_val, n_timesteps, n_features)
+    pred_reshaped = predicted_traj_log.reshape(
+        n_val, n_timesteps, n_features_per_timestep
+    )
+    actual_reshaped = actual_traj_log.reshape(
+        n_val, n_timesteps, n_features_per_timestep
+    )
+
+    # Extract species abundances (first n_species columns) and clip before converting from log to linear
+    pred_species_log = np.clip(pred_reshaped[:, :, :n_species], -20, 0)
+    actual_species_log = np.clip(actual_reshaped[:, :, :n_species], -20, 0)
+
+    pred_species = 10**pred_species_log
+    actual_species = 10**actual_species_log
+
+    # Calculate per-trajectory MAPE in unscaled space (averaged over timesteps and species)
+    errors = (
+        np.mean(
+            np.abs((actual_species - pred_species) / (actual_species + 1e-20)),
+            axis=(1, 2),
+        )
+        * 100
+    )
+
+    print(f"Mean MAPE (unscaled): {errors.mean():.4f}%")
+    print(f"Median MAPE (unscaled): {np.median(errors):.4f}%")
+    print(f"Max MAPE (unscaled): {errors.max():.4f}%")
+
+    print("\nTrajectory shape info:")
     print(f"  Validation trajectories: {n_val}")
-    print(f"  Total flattened features: {total_features}")
+    print(f"  Total flattened features: {predicted_traj_log.shape[1]}")
     print(f"  Species: {n_species}, Params: {n_params}")
     print(f"  Features per timestep: {n_features_per_timestep}")
     print(f"  Timesteps: {n_timesteps}")
@@ -636,7 +759,7 @@ def main(cfg: DictConfig):
     # Calculate max element errors
     print("\nCalculating max element errors...")
     max_element_errors = calculate_max_element_errors(
-        predicted_traj, actual_traj, n_timesteps, n_species, n_params
+        predicted_traj_log, actual_traj_log, n_timesteps, n_species, n_params
     )
     print(f"Mean Max Element Error: {max_element_errors.mean():.4f}%")
     print(f"Median Max Element Error: {np.median(max_element_errors):.4f}%")
@@ -645,7 +768,12 @@ def main(cfg: DictConfig):
     # Calculate per-species errors
     print("\nCalculating per-species errors...")
     species_errors = calculate_per_species_errors(
-        predicted_traj, actual_traj, species_list, n_timesteps, n_species, n_params
+        predicted_traj_log,
+        actual_traj_log,
+        species_list,
+        n_timesteps,
+        n_species,
+        n_params,
     )
 
     # Print species error statistics
@@ -653,15 +781,17 @@ def main(cfg: DictConfig):
     print("\n" + "=" * 60)
     print("PER-SPECIES ERROR ANALYSIS")
     print("=" * 60)
-    print(f"\nWorst performing species:")
+    print("\nWorst performing species:")
     print(
         f"  1. {species_list[sorted_indices[0]]}: {species_errors[sorted_indices[0]]:.2f}% MAPE"
     )
 
-    print(f"\nTop 20 species with highest errors:")
+    print("\nTop 20 species with highest errors:")
     for i in range(20):
         idx = sorted_indices[i]
-        print(f"  {i+1:2d}. {species_list[idx]:12s}: {species_errors[idx]:6.2f}% MAPE")
+        print(
+            f"  {i + 1:2d}. {species_list[idx]:12s}: {species_errors[idx]:6.2f}% MAPE"
+        )
 
     print(f"\nSpecies with MAPE > 50%: {np.sum(species_errors > 50)}")
     print(f"Species with MAPE > 100%: {np.sum(species_errors > 100)}")
@@ -678,20 +808,44 @@ def main(cfg: DictConfig):
         train_pca, val_pca, pca, train_densities, val_densities, output_dir
     )
     plot_tsne_with_errors(
-        train_pca, val_pca, errors, train_densities, val_densities, output_dir
-    )
-    plot_tsne_with_errors(
         train_pca,
         val_pca,
-        max_element_errors,
+        errors,
         train_densities,
         val_densities,
+        output_dir,
+        log_scale=True,
+    )
+    # Filter out top 0.5% worst max errors for better visualization
+    threshold = np.percentile(max_element_errors, 99.5)
+    mask = max_element_errors <= threshold
+    print(
+        f"\nFiltering max errors: removing {(~mask).sum()} outliers above {threshold:.2f}%"
+    )
+
+    plot_tsne_with_errors(
+        train_pca,
+        val_pca[mask],
+        max_element_errors[mask],
+        train_densities,
+        [val_densities[i] for i in range(len(val_densities)) if mask[i]],
         output_dir,
         error_label="Max Element Error (%)",
         filename="tsne_manifold_max_errors.png",
         log_scale=True,
     )
     plot_species_errors(species_errors, species_list, output_dir)
+
+    # Plot MAPE evolution over timesteps
+    print("\nGenerating MAPE vs timestep plot...")
+    plot_mape_vs_timestep(
+        predicted_traj_log,
+        actual_traj_log,
+        output_dir,
+        n_timesteps,
+        n_species,
+        n_params,
+    )
 
     print("\n" + "=" * 60)
     print(f"All plots saved to: {output_dir}")

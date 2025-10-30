@@ -4,8 +4,9 @@ data/*
 
 models/backups/
 grid_folder/
-*.pyc
 __pycache__/
+*.egg-info
+*.pyc
 
 .ruff_cache/
 
