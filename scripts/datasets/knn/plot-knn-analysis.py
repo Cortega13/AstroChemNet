@@ -528,8 +528,13 @@ def plot_validation_trajectory_examples(
     n_features = n_species + n_params
     n_timesteps = train_data.shape[1] // n_features
 
-    # Parameter names
-    param_names = ["log₁₀(ρ)", "log₁₀(χ)", "log₁₀(Aᵥ)", "log₁₀(T)"]
+    # Parameter names (log scale)
+    param_names = [
+        "log₁₀(ρ) [cm⁻³]",
+        "log₁₀(χ) [Habing]",
+        "log₁₀(Aᵥ) [mag]",
+        "log₁₀(T) [K]",
+    ]
 
     # Select trajectories based on error distribution
     sorted_indices = np.argsort(trajectory_errors)
@@ -573,9 +578,12 @@ def plot_validation_trajectory_examples(
         # Extract species and parameters
         pred_species_log = predicted_traj[:, :n_species]
         actual_species_log = actual_traj[:, :n_species]
-        # Parameters are already in log space, don't transform
-        pred_params = predicted_traj[:, n_species:]
-        actual_params = actual_traj[:, n_species:]
+        # Parameters are in linear space - convert to log10 for plotting
+        pred_params_linear = predicted_traj[:, n_species:]
+        actual_params_linear = actual_traj[:, n_species:]
+        # Take absolute value to handle any negative values from PCA reconstruction
+        pred_params = np.log10(np.abs(pred_params_linear) + 1e-10)
+        actual_params = np.log10(np.abs(actual_params_linear) + 1e-10)
 
         # Create dual-panel plot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -614,33 +622,23 @@ def plot_validation_trajectory_examples(
         ax1.grid(alpha=0.3)
         ax1.set_ylim(-20, 0.5)
 
-        # Right panel: Physical parameters
+        # Right panel: Physical parameters (ground truth only)
         colors_params = plt.cm.viridis(np.linspace(0, 1, n_params))  # type: ignore
         for i, (param_name, color) in enumerate(zip(param_names, colors_params)):
-            # Ground truth
+            # Ground truth only
             ax2.plot(
                 timesteps,
                 actual_params[:, i],
-                label=f"{param_name} (truth)",
+                label=param_name,
                 color=color,
                 linewidth=2,
                 linestyle="-",
                 alpha=0.8,
             )
-            # KNN prediction
-            ax2.plot(
-                timesteps,
-                pred_params[:, i],
-                label=f"{param_name} (KNN)",
-                color=color,
-                linewidth=1.5,
-                linestyle="--",
-                alpha=0.6,
-            )
 
         ax2.set_xlabel("Timestep", fontsize=12)
-        ax2.set_ylabel("Parameter Value", fontsize=12)
-        ax2.set_title("Physical Conditions", fontsize=14, fontweight="bold")
+        ax2.set_ylabel("log₁₀(Parameter Value)", fontsize=12)
+        ax2.set_title("Physical Conditions (log scale)", fontsize=14, fontweight="bold")
         ax2.legend(fontsize=9, loc="best")
         ax2.grid(alpha=0.3)
 
@@ -1120,12 +1118,24 @@ def run_analysis(cfg: DictConfig, output_dir: Path):
 
 @hydra.main(config_path="../../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    # Set Hydra output directory to project outputs
+    import os
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    hydra_output_dir = project_root / "outputs" / "hydra_logs"
+    os.environ["HYDRA_RUN_DIR"] = str(hydra_output_dir)
     """Generate comprehensive visualizations of KNN-based trajectory predictions."""
     print("=" * 60)
     print("KNN Trajectory Prediction Analysis")
     print("=" * 60)
 
-    output_dir = Path("outputs/plots/knn_analysis")
+    # Use absolute path relative to project root
+    output_dir = (
+        Path(__file__).parent.parent.parent.parent
+        / "outputs"
+        / "plots"
+        / "knn_analysis"
+    )
 
     run_analysis(cfg, output_dir)
 

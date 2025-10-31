@@ -140,7 +140,7 @@ hydra:
     - path: ''
       schema: structured
       provider: schema
-    output_dir: c:\Users\carlo\Projects\AstroResearch\AstroChemNet\scripts\datasets\knn\outputs\2025-10-31\11-28-05
+    output_dir: c:\Users\carlo\Projects\AstroResearch\AstroChemNet\scripts\datasets\knn\outputs\2025-10-31\13-25-20
     choices:
       models: autoencoder
       datasets: grav

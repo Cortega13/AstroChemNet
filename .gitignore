@@ -27,5 +27,5 @@ __pycache__/
 utils/
 *.ipynb
 
-outputs/*.log
-outputs/*.yaml
+outputs/**/*.log
+outputs/**/*.yaml
