@@ -1,6 +1,8 @@
 """Generate comprehensive visualizations of KNN-based trajectory predictions in PCA space."""
 
+import json
 from pathlib import Path
+from typing import Tuple
 
 import hydra
 import matplotlib.pyplot as plt
@@ -171,7 +173,7 @@ def plot_tsne_with_errors(
     """Plot t-SNE visualization with training and validation points colored by error."""
     print(f"Computing t-SNE embedding for {filename}...")
     combined_pca = np.vstack([train_pca, val_pca])
-    tsne = TSNE(n_components=2, random_state=42, perplexity=50, n_iter=1000)
+    tsne = TSNE(n_components=2, random_state=42, perplexity=50, max_iter=1000)
     tsne_data = tsne.fit_transform(combined_pca)
 
     train_tsne = tsne_data[: len(train_pca)]
@@ -473,121 +475,20 @@ def plot_neighbor_examples(
     print(f"Saved: {output_dir / 'neighbor_examples.png'}")
 
 
-def plot_species_errors(
-    species_errors: np.ndarray, species_list: list, output_dir: Path, top_n: int = 20
-):
-    """Plot species-level error distribution and highlight worst performers."""
-    sorted_indices = np.argsort(species_errors)[::-1]
-    top_indices = sorted_indices[:top_n]
-
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-
-    # Top-left: Histogram of all species errors
-    axes[0, 0].hist(
-        species_errors, bins=50, color="steelblue", alpha=0.7, edgecolor="black"
-    )
-    axes[0, 0].axvline(
-        species_errors.mean(),
-        color="red",
-        linestyle="--",
-        linewidth=2,
-        label="Mean",
-    )
-    axes[0, 0].axvline(
-        np.median(species_errors),
-        color="orange",
-        linestyle="--",
-        linewidth=2,
-        label="Median",
-    )
-    axes[0, 0].set_xlabel("Species MAPE (%)")
-    axes[0, 0].set_ylabel("Count")
-    axes[0, 0].set_title("Distribution of Per-Species Prediction Errors")
-    axes[0, 0].legend()
-    axes[0, 0].grid(axis="y", alpha=0.3)
-
-    # Top-right: Top 20 worst species
-    top_species = [species_list[i] for i in top_indices]
-    top_errors = species_errors[top_indices]
-
-    y_pos = np.arange(len(top_species))
-    axes[0, 1].barh(y_pos, top_errors, color="darkred", alpha=0.7)
-    axes[0, 1].set_yticks(y_pos)
-    axes[0, 1].set_yticklabels(top_species, fontsize=8)
-    axes[0, 1].set_xlabel("MAPE (%)")
-    axes[0, 1].set_title(f"Top {top_n} Species with Highest Errors")
-    axes[0, 1].invert_yaxis()
-    axes[0, 1].grid(axis="x", alpha=0.3)
-
-    # Bottom-left: Cumulative error contribution
-    sorted_errors = species_errors[sorted_indices]
-    cumulative_contribution = np.cumsum(sorted_errors) / np.sum(sorted_errors) * 100
-    axes[1, 0].plot(
-        range(1, len(cumulative_contribution) + 1),
-        cumulative_contribution,
-        linewidth=2,
-        color="steelblue",
-    )
-    axes[1, 0].axhline(
-        y=50, color="red", linestyle="--", alpha=0.5, label="50% of total error"
-    )
-    axes[1, 0].axhline(
-        y=80, color="orange", linestyle="--", alpha=0.5, label="80% of total error"
-    )
-    axes[1, 0].set_xlabel("Number of Species (sorted by error)")
-    axes[1, 0].set_ylabel("Cumulative Error Contribution (%)")
-    axes[1, 0].set_title("Cumulative Error Contribution by Species")
-    axes[1, 0].legend()
-    axes[1, 0].grid(alpha=0.3)
-
-    # Bottom-right: Error statistics table
-    axes[1, 1].axis("off")
-    stats_text = f"""Species Error Statistics
-========================
-
-Total Species: {len(species_list)}
-
-Mean MAPE: {species_errors.mean():.2f}%
-Median MAPE: {np.median(species_errors):.2f}%
-Std Dev: {species_errors.std():.2f}%
-
-Min Error: {species_errors.min():.2f}% ({species_list[np.argmin(species_errors)]})
-Max Error: {species_errors.max():.2f}% ({species_list[np.argmax(species_errors)]})
-
-Species with MAPE > 50%: {np.sum(species_errors > 50)}
-Species with MAPE > 100%: {np.sum(species_errors > 100)}
-
-Top 3 Worst Species:
-1. {species_list[top_indices[0]]}: {species_errors[top_indices[0]]:.2f}%
-2. {species_list[top_indices[1]]}: {species_errors[top_indices[1]]:.2f}%
-3. {species_list[top_indices[2]]}: {species_errors[top_indices[2]]:.2f}%
-"""
-    axes[1, 1].text(
-        0.1,
-        0.5,
-        stats_text,
-        fontsize=10,
-        verticalalignment="center",
-        family="monospace",
-    )
-
-    plt.tight_layout()
-    plt.savefig(output_dir / "species_error_analysis.png", dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"Saved: {output_dir / 'species_error_analysis.png'}")
-
-
 def plot_mape_vs_timestep(
     predicted_traj: np.ndarray,
     actual_traj: np.ndarray,
     output_dir: Path,
-    n_timesteps: int = 298,
     n_species: int = 333,
     n_params: int = 4,
 ):
     """Plot MAPE evolution across timesteps."""
     n_val = len(predicted_traj)
     n_features = n_species + n_params
+
+    # Calculate timesteps from data shape
+    total_features = predicted_traj.shape[1]
+    n_timesteps = total_features // n_features
 
     # Reshape to (n_val, n_timesteps, n_features)
     pred_reshaped = predicted_traj.reshape(n_val, n_timesteps, n_features)
@@ -664,40 +565,40 @@ def plot_mape_vs_timestep(
     print(f"Saved: {output_dir / 'mape_vs_timestep.png'}")
 
 
-@hydra.main(config_path="../../configs", config_name="config", version_base=None)
-def main(cfg: DictConfig):
-    """Generate comprehensive visualizations of KNN-based trajectory predictions."""
-    print("=" * 60)
-    print("KNN Trajectory Prediction Analysis")
-    print("=" * 60)
-
-    # Create output directory
-    output_dir = Path("outputs/plots/knn_analysis")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Load data
+def load_and_prepare_data(cfg: DictConfig) -> Tuple[dict, dict, list, list]:
+    """Load datasets and extract trajectory data."""
     print("\nLoading datasets...")
     training_np, validation_np = dl.load_dataset(cfg.dataset)
 
-    # Extract trajectories
     print("Extracting trajectories...")
     train_trajectories, train_densities = extract_trajectories(cfg, training_np)
     val_trajectories, val_densities = extract_trajectories(cfg, validation_np)
 
-    # Flatten and apply PCA
+    return train_trajectories, val_trajectories, train_densities, val_densities
+
+
+def compute_pca_representation(
+    train_trajectories: dict, val_trajectories: dict, n_components: int = 5
+) -> Tuple[PCA, np.ndarray, np.ndarray]:
+    """Apply PCA to flattened trajectory data."""
     print("Applying PCA...")
     train_data = flatten_trajectories(train_trajectories)
     val_data = flatten_trajectories(val_trajectories)
 
-    pca = PCA(n_components=5)
+    pca = PCA(n_components=n_components)
     train_pca = pca.fit_transform(train_data)
     val_pca = pca.transform(val_data)
 
     print(f"PCA explained variance: {pca.explained_variance_ratio_}")
+    return pca, train_pca, val_pca
 
-    # KNN predictions
+
+def compute_knn_predictions(
+    train_pca: np.ndarray, val_pca: np.ndarray, n_neighbors: int = 10
+) -> np.ndarray:
+    """Compute KNN predictions in PCA space."""
     print("Computing KNN predictions...")
-    knn = NearestNeighbors(n_neighbors=10, metric="euclidean")
+    knn = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean")
     knn.fit(train_pca)
     distances, indices = knn.kneighbors(val_pca)
 
@@ -709,11 +610,20 @@ def main(cfg: DictConfig):
         neighbor_components = train_pca[indices[i]]
         predicted_pca[i] = (weights[i][:, np.newaxis] * neighbor_components).sum(axis=0)
 
-    # Calculate per-trajectory errors (MAPE) in unscaled space
+    return predicted_pca
+
+
+def calculate_error_metrics(
+    cfg: DictConfig, pca: PCA, predicted_pca: np.ndarray, val_pca: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, dict, np.ndarray, np.ndarray]:
+    """Calculate comprehensive error metrics."""
+    print("Calculating error metrics...")
+
+    # Inverse transform to get trajectory data
     predicted_traj_log = pca.inverse_transform(predicted_pca)
     actual_traj_log = pca.inverse_transform(val_pca)
 
-    # Determine trajectory dimensions
+    # Get dimensions
     species_list = get_species_list(cfg)
     n_species = len(species_list)
     n_params = len(cfg.dataset.parameters)
@@ -721,7 +631,7 @@ def main(cfg: DictConfig):
     n_timesteps = predicted_traj_log.shape[1] // n_features_per_timestep
     n_val = len(predicted_traj_log)
 
-    # Reshape to (n_val, n_timesteps, n_features)
+    # Reshape and calculate errors
     pred_reshaped = predicted_traj_log.reshape(
         n_val, n_timesteps, n_features_per_timestep
     )
@@ -729,15 +639,14 @@ def main(cfg: DictConfig):
         n_val, n_timesteps, n_features_per_timestep
     )
 
-    # Extract species abundances (first n_species columns) and clip before converting from log to linear
     pred_species_log = np.clip(pred_reshaped[:, :, :n_species], -20, 0)
     actual_species_log = np.clip(actual_reshaped[:, :, :n_species], -20, 0)
 
     pred_species = 10**pred_species_log
     actual_species = 10**actual_species_log
 
-    # Calculate per-trajectory MAPE in unscaled space (averaged over timesteps and species)
-    errors = (
+    # Per-trajectory MAPE
+    trajectory_errors = (
         np.mean(
             np.abs((actual_species - pred_species) / (actual_species + 1e-20)),
             axis=(1, 2),
@@ -745,28 +654,12 @@ def main(cfg: DictConfig):
         * 100
     )
 
-    print(f"Mean MAPE (unscaled): {errors.mean():.4f}%")
-    print(f"Median MAPE (unscaled): {np.median(errors):.4f}%")
-    print(f"Max MAPE (unscaled): {errors.max():.4f}%")
-
-    print("\nTrajectory shape info:")
-    print(f"  Validation trajectories: {n_val}")
-    print(f"  Total flattened features: {predicted_traj_log.shape[1]}")
-    print(f"  Species: {n_species}, Params: {n_params}")
-    print(f"  Features per timestep: {n_features_per_timestep}")
-    print(f"  Timesteps: {n_timesteps}")
-
-    # Calculate max element errors
-    print("\nCalculating max element errors...")
+    # Max element errors
     max_element_errors = calculate_max_element_errors(
         predicted_traj_log, actual_traj_log, n_timesteps, n_species, n_params
     )
-    print(f"Mean Max Element Error: {max_element_errors.mean():.4f}%")
-    print(f"Median Max Element Error: {np.median(max_element_errors):.4f}%")
-    print(f"Max Element Error: {max_element_errors.max():.4f}%")
 
-    # Calculate per-species errors
-    print("\nCalculating per-species errors...")
+    # Per-species errors
     species_errors = calculate_per_species_errors(
         predicted_traj_log,
         actual_traj_log,
@@ -776,51 +669,115 @@ def main(cfg: DictConfig):
         n_params,
     )
 
-    # Print species error statistics
+    # Create error summary
+    error_summary = {
+        "trajectory_errors": {
+            "mean_mape": float(trajectory_errors.mean()),
+            "median_mape": float(np.median(trajectory_errors)),
+            "max_mape": float(trajectory_errors.max()),
+        },
+        "max_element_errors": {
+            "mean": float(max_element_errors.mean()),
+            "median": float(np.median(max_element_errors)),
+            "max": float(max_element_errors.max()),
+        },
+        "dimensions": {
+            "n_validation_trajectories": int(n_val),
+            "n_species": int(n_species),
+            "n_params": int(n_params),
+            "n_timesteps": int(n_timesteps),
+            "total_features": int(predicted_traj_log.shape[1]),
+        },
+    }
+
+    return (
+        trajectory_errors,
+        max_element_errors,
+        species_errors,
+        error_summary,
+        predicted_traj_log,
+        actual_traj_log,
+    )
+
+
+def save_species_error_statistics(
+    species_errors: np.ndarray, species_list: list, output_dir: Path
+) -> None:
+    """Save species error statistics to JSON file."""
+    print("Saving species error statistics...")
+
     sorted_indices = np.argsort(species_errors)[::-1]
-    print("\n" + "=" * 60)
-    print("PER-SPECIES ERROR ANALYSIS")
-    print("=" * 60)
-    print("\nWorst performing species:")
-    print(
-        f"  1. {species_list[sorted_indices[0]]}: {species_errors[sorted_indices[0]]:.2f}% MAPE"
-    )
 
-    print("\nTop 20 species with highest errors:")
-    for i in range(20):
-        idx = sorted_indices[i]
-        print(
-            f"  {i + 1:2d}. {species_list[idx]:12s}: {species_errors[idx]:6.2f}% MAPE"
-        )
+    statistics = {
+        "summary": {
+            "total_species": len(species_list),
+            "mean_mape": float(species_errors.mean()),
+            "median_mape": float(np.median(species_errors)),
+            "std_mape": float(species_errors.std()),
+            "min_error": float(species_errors.min()),
+            "max_error": float(species_errors.max()),
+            "species_with_mape_gt_50": int(np.sum(species_errors > 50)),
+            "species_with_mape_gt_100": int(np.sum(species_errors > 100)),
+        },
+        "worst_species": {
+            "name": species_list[sorted_indices[0]],
+            "mape": float(species_errors[sorted_indices[0]]),
+        },
+        "best_species": {
+            "name": species_list[np.argmin(species_errors)],
+            "mape": float(species_errors.min()),
+        },
+        "top_20_worst": [
+            {
+                "rank": i + 1,
+                "species": species_list[sorted_indices[i]],
+                "mape": float(species_errors[sorted_indices[i]]),
+            }
+            for i in range(min(20, len(species_list)))
+        ],
+        "all_species_errors": {
+            species_list[i]: float(species_errors[i]) for i in range(len(species_list))
+        },
+    }
 
-    print(f"\nSpecies with MAPE > 50%: {np.sum(species_errors > 50)}")
-    print(f"Species with MAPE > 100%: {np.sum(species_errors > 100)}")
-    print("=" * 60)
+    json_path = output_dir / "species_error_statistics.json"
+    with open(json_path, "w") as f:
+        json.dump(statistics, f, indent=2)
 
-    # Generate plots
+    print(f"Saved: {json_path}")
+
+
+def generate_visualizations(
+    train_pca: np.ndarray,
+    val_pca: np.ndarray,
+    pca: PCA,
+    train_densities: list,
+    val_densities: list,
+    trajectory_errors: np.ndarray,
+    max_element_errors: np.ndarray,
+    predicted_traj_log: np.ndarray,
+    actual_traj_log: np.ndarray,
+    output_dir: Path,
+) -> None:
+    """Generate t-SNE visualizations and MAPE vs timestep plot."""
     print("\nGenerating visualizations...")
-    plot_pca_variance(pca, output_dir)
-    plot_pca_space_2d(
-        train_pca, val_pca, train_densities, val_densities, errors, output_dir
-    )
-    plot_knn_distance_analysis(train_pca, val_pca, errors, output_dir)
-    plot_neighbor_examples(
-        train_pca, val_pca, pca, train_densities, val_densities, output_dir
-    )
+
+    # t-SNE with regular errors
     plot_tsne_with_errors(
         train_pca,
         val_pca,
-        errors,
+        trajectory_errors,
         train_densities,
         val_densities,
         output_dir,
         log_scale=True,
     )
-    # Filter out top 0.5% worst max errors for better visualization
+
+    # t-SNE with filtered max element errors for better visualization
     threshold = np.percentile(max_element_errors, 99.5)
     mask = max_element_errors <= threshold
     print(
-        f"\nFiltering max errors: removing {(~mask).sum()} outliers above {threshold:.2f}%"
+        f"Filtering max errors: removing {(~mask).sum()} outliers above {threshold:.2f}%"
     )
 
     plot_tsne_with_errors(
@@ -834,21 +791,113 @@ def main(cfg: DictConfig):
         filename="tsne_manifold_max_errors.png",
         log_scale=True,
     )
-    plot_species_errors(species_errors, species_list, output_dir)
 
-    # Plot MAPE evolution over timesteps
-    print("\nGenerating MAPE vs timestep plot...")
-    plot_mape_vs_timestep(
+    # MAPE evolution over timesteps
+    print("Generating MAPE vs timestep plot...")
+    plot_mape_vs_timestep(predicted_traj_log, actual_traj_log, output_dir)
+
+
+def print_error_summary(
+    error_summary: dict, species_errors: np.ndarray, species_list: list
+) -> None:
+    """Print comprehensive error analysis summary."""
+    traj_errors = error_summary["trajectory_errors"]
+    max_errors = error_summary["max_element_errors"]
+    dims = error_summary["dimensions"]
+
+    print(f"Mean MAPE (unscaled): {traj_errors['mean_mape']:.4f}%")
+    print(f"Median MAPE (unscaled): {traj_errors['median_mape']:.4f}%")
+    print(f"Max MAPE (unscaled): {traj_errors['max_mape']:.4f}%")
+
+    print("\nTrajectory shape info:")
+    print(f"  Validation trajectories: {dims['n_validation_trajectories']}")
+    print(f"  Total flattened features: {dims['total_features']}")
+    print(f"  Species: {dims['n_species']}, Params: {dims['n_params']}")
+    print(f"  Features per timestep: {dims['n_species'] + dims['n_params']}")
+    print(f"  Timesteps: {dims['n_timesteps']}")
+
+    print(f"\nMean Max Element Error: {max_errors['mean']:.4f}%")
+    print(f"Median Max Element Error: {max_errors['median']:.4f}%")
+    print(f"Max Element Error: {max_errors['max']:.4f}%")
+
+    # Species error summary
+    sorted_indices = np.argsort(species_errors)[::-1]
+    print("\n" + "=" * 60)
+    print("PER-SPECIES ERROR ANALYSIS")
+    print("=" * 60)
+    print("\nWorst performing species:")
+    print(
+        f"  1. {species_list[sorted_indices[0]]}: {species_errors[sorted_indices[0]]:.2f}% MAPE"
+    )
+
+    print("\nTop 20 species with highest errors:")
+    for i in range(min(20, len(species_list))):
+        idx = sorted_indices[i]
+        print(
+            f"  {i + 1:2d}. {species_list[idx]:12s}: {species_errors[idx]:6.2f}% MAPE"
+        )
+
+    print(f"\nSpecies with MAPE > 50%: {np.sum(species_errors > 50)}")
+    print(f"Species with MAPE > 100%: {np.sum(species_errors > 100)}")
+    print("=" * 60)
+
+
+@hydra.main(config_path="../../configs", config_name="config", version_base=None)
+def main(cfg: DictConfig):
+    """Generate comprehensive visualizations of KNN-based trajectory predictions."""
+    print("=" * 60)
+    print("KNN Trajectory Prediction Analysis")
+    print("=" * 60)
+
+    # Setup
+    output_dir = Path("outputs/plots/knn_analysis")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load and prepare data
+    train_trajectories, val_trajectories, train_densities, val_densities = (
+        load_and_prepare_data(cfg)
+    )
+
+    # Compute PCA representation
+    pca, train_pca, val_pca = compute_pca_representation(
+        train_trajectories, val_trajectories
+    )
+
+    # Compute KNN predictions
+    predicted_pca = compute_knn_predictions(train_pca, val_pca)
+
+    # Calculate comprehensive error metrics
+    (
+        trajectory_errors,
+        max_element_errors,
+        species_errors,
+        error_summary,
+        predicted_traj_log,
+        actual_traj_log,
+    ) = calculate_error_metrics(cfg, pca, predicted_pca, val_pca)
+
+    # Print analysis results
+    print_error_summary(error_summary, species_errors, get_species_list(cfg))
+
+    # Save species statistics to JSON
+    save_species_error_statistics(species_errors, get_species_list(cfg), output_dir)
+
+    # Generate visualizations
+    generate_visualizations(
+        train_pca,
+        val_pca,
+        pca,
+        train_densities,
+        val_densities,
+        trajectory_errors,
+        max_element_errors,
         predicted_traj_log,
         actual_traj_log,
         output_dir,
-        n_timesteps,
-        n_species,
-        n_params,
     )
 
     print("\n" + "=" * 60)
-    print(f"All plots saved to: {output_dir}")
+    print(f"All outputs saved to: {output_dir}")
     print("=" * 60)
 
 

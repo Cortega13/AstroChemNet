@@ -27,7 +27,8 @@ ruff check --fix && ruff format
 
 ## Key Metrics
 
-- **Current baseline**: PCA+KNN achieves 0.057% MAPE
+# We primarily care about the chemical abundances predictions metrics. These metrics muse use MAPE on unscaled abundances. Not log10.
+
 - **Dataset**: 9,989 tracers × 298 timesteps (~3M samples)
 - **Species range**: 10⁻²⁰ to 1.0 (20 orders of magnitude)
 - **Challenging species**: S, HS₂, S⁺, OCS (sulfur chemistry)
