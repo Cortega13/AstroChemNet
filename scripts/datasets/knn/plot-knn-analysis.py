@@ -40,8 +40,9 @@ def extract_trajectories(cfg: DictConfig, dataset: np.ndarray) -> tuple[dict, li
         log_abundances = np.log10(abundances + 1e-20)
 
         parameters = subset[:, num_metadata : num_metadata + num_params].copy()
+        log_parameters = np.log10(np.maximum(parameters, 1e-10))
 
-        combined_trajectories[model] = np.hstack((log_abundances, parameters))
+        combined_trajectories[model] = np.hstack((log_abundances, log_parameters))
         final_log_density.append(np.log10(subset[-1, num_metadata]))
 
     return combined_trajectories, final_log_density
@@ -141,38 +142,6 @@ def calculate_max_element_errors(
     return max_errors
 
 
-def plot_pca_variance(pca: PCA, output_dir: Path):
-    """Plot explained variance ratio for PCA components."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-
-    # Individual variance
-    ax1.bar(range(1, 6), pca.explained_variance_ratio_, color="steelblue", alpha=0.8)
-    ax1.set_xlabel("Principal Component")
-    ax1.set_ylabel("Explained Variance Ratio")
-    ax1.set_title("Variance Explained by Each PC")
-    ax1.set_xticks(range(1, 6))
-    ax1.grid(axis="y", alpha=0.3)
-
-    # Cumulative variance
-    cumvar = np.cumsum(pca.explained_variance_ratio_)
-    ax2.plot(
-        range(1, 6), cumvar, marker="o", linewidth=2, markersize=8, color="darkred"
-    )
-    ax2.axhline(y=0.95, color="gray", linestyle="--", alpha=0.5, label="95% threshold")
-    ax2.axhline(y=0.99, color="gray", linestyle="--", alpha=0.5, label="99% threshold")
-    ax2.set_xlabel("Number of Components")
-    ax2.set_ylabel("Cumulative Explained Variance")
-    ax2.set_title("Cumulative Variance Explained")
-    ax2.set_xticks(range(1, 6))
-    ax2.legend()
-    ax2.grid(alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(output_dir / "pca_variance.png", dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"Saved: {output_dir / 'pca_variance.png'}")
-
-
 def plot_tsne_with_errors(
     train_pca: np.ndarray,
     val_pca: np.ndarray,
@@ -220,7 +189,7 @@ def plot_tsne_with_errors(
     plt.colorbar(sc1, ax=axes[0], label="log₁₀(Final Density)")
     axes[0].set_xlabel("t-SNE Component 1")
     axes[0].set_ylabel("t-SNE Component 2")
-    axes[0].set_title("Trajectory Manifold (colored by final density)")
+    axes[0].set_title("Trajectory t-SNE (colored by final density)")
     axes[0].legend()
 
     # Right: validation colored by prediction error
@@ -261,221 +230,56 @@ def plot_tsne_with_errors(
     print(f"Saved: {output_dir / filename}")
 
 
-def plot_knn_distance_analysis(
-    train_pca: np.ndarray, val_pca: np.ndarray, errors: np.ndarray, output_dir: Path
-):
-    """Analyze relationship between KNN distances and prediction errors."""
-    knn = NearestNeighbors(n_neighbors=10, metric="euclidean")
-    knn.fit(train_pca)
-    distances, indices = knn.kneighbors(val_pca)
-
-    mean_distances = distances.mean(axis=1)
-    min_distances = distances[:, 0]
-
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-
-    # Top left: Error vs mean KNN distance
-    axes[0, 0].scatter(mean_distances, errors, alpha=0.5, s=10, color="steelblue")
-    axes[0, 0].set_xlabel("Mean Distance to 10 Nearest Neighbors")
-    axes[0, 0].set_ylabel("MAPE (%)")
-    axes[0, 0].set_title("Prediction Error vs. Mean KNN Distance")
-    axes[0, 0].grid(alpha=0.3)
-
-    # Top right: Error vs nearest neighbor distance
-    axes[0, 1].scatter(min_distances, errors, alpha=0.5, s=10, color="darkred")
-    axes[0, 1].set_xlabel("Distance to Nearest Neighbor")
-    axes[0, 1].set_ylabel("MAPE (%)")
-    axes[0, 1].set_title("Prediction Error vs. Closest Neighbor Distance")
-    axes[0, 1].grid(alpha=0.3)
-
-    # Bottom left: Distribution of KNN distances
-    axes[1, 0].hist(
-        mean_distances, bins=50, color="green", alpha=0.7, edgecolor="black"
-    )
-    axes[1, 0].axvline(
-        mean_distances.mean(), color="red", linestyle="--", linewidth=2, label="Mean"
-    )
-    axes[1, 0].axvline(
-        np.median(mean_distances),
-        color="orange",
-        linestyle="--",
-        linewidth=2,
-        label="Median",
-    )
-    axes[1, 0].set_xlabel("Mean Distance to Neighbors")
-    axes[1, 0].set_ylabel("Count")
-    axes[1, 0].set_title("Distribution of Mean KNN Distances")
-    axes[1, 0].legend()
-    axes[1, 0].grid(axis="y", alpha=0.3)
-
-    # Bottom right: Error distribution
-    axes[1, 1].hist(errors, bins=50, color="purple", alpha=0.7, edgecolor="black")
-    axes[1, 1].axvline(
-        errors.mean(), color="red", linestyle="--", linewidth=2, label="Mean"
-    )
-    axes[1, 1].axvline(
-        np.median(errors), color="orange", linestyle="--", linewidth=2, label="Median"
-    )
-    axes[1, 1].set_xlabel("MAPE (%)")
-    axes[1, 1].set_ylabel("Count")
-    axes[1, 1].set_title("Distribution of Prediction Errors")
-    axes[1, 1].legend()
-    axes[1, 1].grid(axis="y", alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(output_dir / "knn_distance_analysis.png", dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"Saved: {output_dir / 'knn_distance_analysis.png'}")
-
-
-def plot_pca_space_2d(
+def plot_tsne_combined_density(
     train_pca: np.ndarray,
     val_pca: np.ndarray,
     train_densities: list,
     val_densities: list,
-    errors: np.ndarray,
     output_dir: Path,
-):
-    """Plot first two PCA components showing 1D manifold structure."""
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    filename: str = "tsne_combined_density.png",
+) -> None:
+    """Plot t-SNE visualization of combined trajectories colored by final density."""
+    print(f"Computing t-SNE embedding for {filename}...")
 
-    # Left: colored by density
-    sc1 = axes[0].scatter(
-        train_pca[:, 0],
-        train_pca[:, 1],
-        c=train_densities,
-        s=5,
-        cmap="viridis",
-        alpha=0.4,
-        label="Training",
-    )
-    axes[0].scatter(
-        val_pca[:, 0],
-        val_pca[:, 1],
-        c=val_densities,
-        s=15,
-        cmap="viridis",
-        alpha=0.8,
-        marker="^",
-        edgecolors="black",
-        linewidths=0.5,
-        label="Validation",
-    )
-    plt.colorbar(sc1, ax=axes[0], label="log₁₀(Final Density)")
-    axes[0].set_xlabel("PC1 (98.6% variance)")
-    axes[0].set_ylabel("PC2 (0.8% variance)")
-    axes[0].set_title("First Two Principal Components (1D Manifold Structure)")
-    axes[0].legend()
-    axes[0].grid(alpha=0.3)
+    # Combine training and validation data
+    combined_pca = np.vstack([train_pca, val_pca])
+    combined_densities = train_densities + val_densities
 
-    # Right: validation colored by error
-    axes[1].scatter(
-        train_pca[:, 0],
-        train_pca[:, 1],
-        c="lightgray",
-        s=3,
-        alpha=0.3,
-        label="Training",
+    # Compute t-SNE
+    tsne = TSNE(n_components=2, random_state=42, perplexity=50, max_iter=1000)
+    tsne_data = tsne.fit_transform(combined_pca)
+
+    # Create plot
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+    # Scatter plot colored by density
+    sc = ax.scatter(
+        tsne_data[:, 0],
+        tsne_data[:, 1],
+        c=combined_densities,
+        s=8,
+        cmap="viridis",
+        alpha=0.7,
+        edgecolors="none",
     )
-    sc2 = axes[1].scatter(
-        val_pca[:, 0],
-        val_pca[:, 1],
-        c=errors,
-        s=25,
-        cmap="hot_r",
-        alpha=0.9,
-        marker="^",
-        edgecolors="black",
-        linewidths=0.5,
+
+    # Add colorbar
+    plt.colorbar(sc, ax=ax, label="log₁₀(Final Density)")
+
+    # Labels and title
+    ax.set_xlabel("t-SNE Component 1", fontsize=12)
+    ax.set_ylabel("t-SNE Component 2", fontsize=12)
+    ax.set_title(
+        "Combined Trajectory t-SNE (colored by final density)",
+        fontsize=14,
+        fontweight="bold",
     )
-    plt.colorbar(sc2, ax=axes[1], label="MAPE (%)")
-    axes[1].set_xlabel("PC1 (98.6% variance)")
-    axes[1].set_ylabel("PC2 (0.8% variance)")
-    axes[1].set_title("Validation Error in PCA Space")
-    axes[1].legend()
-    axes[1].grid(alpha=0.3)
+    ax.grid(alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(output_dir / "pca_space_2d.png", dpi=300, bbox_inches="tight")
+    plt.savefig(output_dir / filename, dpi=300, bbox_inches="tight")
     plt.close()
-    print(f"Saved: {output_dir / 'pca_space_2d.png'}")
-
-
-def plot_neighbor_examples(
-    train_pca: np.ndarray,
-    val_pca: np.ndarray,
-    pca: PCA,
-    train_densities: list,
-    val_densities: list,
-    output_dir: Path,
-):
-    """Show examples of validation points and their nearest neighbors."""
-    knn = NearestNeighbors(n_neighbors=5, metric="euclidean")
-    knn.fit(train_pca)
-
-    # Select 4 validation examples with different characteristics
-    val_indices = [
-        np.argmin(val_densities),  # Lowest density
-        np.argmax(val_densities),  # Highest density
-        len(val_densities) // 3,  # Mid-range 1
-        2 * len(val_densities) // 3,  # Mid-range 2
-    ]
-
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-    axes = axes.flatten()
-
-    for idx, val_idx in enumerate(val_indices):
-        val_point = val_pca[val_idx : val_idx + 1]
-        distances, neighbor_indices = knn.kneighbors(val_point)
-
-        # Plot in PC1-PC2 space
-        axes[idx].scatter(
-            train_pca[:, 0],
-            train_pca[:, 1],
-            c="lightgray",
-            s=2,
-            alpha=0.2,
-            label="All training",
-        )
-
-        # Highlight neighbors
-        neighbor_pca = train_pca[neighbor_indices[0]]
-        neighbor_dens = [train_densities[i] for i in neighbor_indices[0]]
-
-        for i, (npc, nd) in enumerate(zip(neighbor_pca, neighbor_dens)):
-            axes[idx].scatter(
-                npc[0],
-                npc[1],
-                s=100,
-                alpha=0.7,
-                label=f"Neighbor {i + 1} (ρ={nd:.2f})",
-                marker="o",
-                edgecolors="black",
-                linewidths=1.5,
-            )
-
-        # Plot validation point
-        axes[idx].scatter(
-            val_point[0, 0],
-            val_point[0, 1],
-            s=200,
-            c="red",
-            marker="*",
-            label=f"Val (ρ={val_densities[val_idx]:.2f})",
-            edgecolors="black",
-            linewidths=2,
-            zorder=10,
-        )
-
-        # Draw lines to neighbors
-        for npc in neighbor_pca:
-            axes[idx].plot(
-                [val_point[0, 0], npc[0]],
-                [val_point[0, 1], npc[1]],
-                "k--",
-                alpha=0.3,
-                linewidth=0.5,
-            )
+    print(f"Saved: {output_dir / filename}")
 
 
 def get_species_indices(species_list: list, target_species: list) -> list:
@@ -554,6 +358,11 @@ def plot_validation_trajectory_examples(
     knn.fit(train_pca)
 
     for filename, val_idx, title_suffix in example_configs:
+        # Debug: Print actual error value for this trajectory
+        print(
+            f"\n{title_suffix}: Index {val_idx}, MAPE = {trajectory_errors[val_idx]:.4f}%"
+        )
+
         # Get KNN prediction for this validation trajectory
         val_point = val_pca[val_idx : val_idx + 1]
         distances, indices = knn.kneighbors(val_point)
@@ -575,15 +384,11 @@ def plot_validation_trajectory_examples(
         )
         actual_traj = val_data[val_idx].reshape(n_timesteps, n_features)
 
-        # Extract species and parameters
+        # Extract species and parameters (both already in log space)
         pred_species_log = predicted_traj[:, :n_species]
         actual_species_log = actual_traj[:, :n_species]
-        # Parameters are in linear space - convert to log10 for plotting
-        pred_params_linear = predicted_traj[:, n_species:]
-        actual_params_linear = actual_traj[:, n_species:]
-        # Take absolute value to handle any negative values from PCA reconstruction
-        pred_params = np.log10(np.abs(pred_params_linear) + 1e-10)
-        actual_params = np.log10(np.abs(actual_params_linear) + 1e-10)
+        # Parameters are already in log space from extract_trajectories
+        actual_params_log = actual_traj[:, n_species:]
 
         # Create dual-panel plot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -628,7 +433,7 @@ def plot_validation_trajectory_examples(
             # Ground truth only
             ax2.plot(
                 timesteps,
-                actual_params[:, i],
+                actual_params_log[:, i],
                 label=param_name,
                 color=color,
                 linewidth=2,
@@ -727,7 +532,7 @@ def plot_mape_vs_timestep(
     )
     axes[0].set_xlabel("Timestep")
     axes[0].set_ylabel("MAPE (%)")
-    axes[0].set_title("Prediction Error Evolution (Linear Scale)")
+    axes[0].set_title("Prediction Error (Linear Scale)")
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
@@ -744,7 +549,7 @@ def plot_mape_vs_timestep(
     axes[1].set_xlabel("Timestep")
     axes[1].set_ylabel("MAPE (%)")
     axes[1].set_yscale("log")
-    axes[1].set_title("Prediction Error Evolution (Log Scale)")
+    axes[1].set_title("Prediction Error (Log Scale)")
     axes[1].legend()
     axes[1].grid(alpha=0.3, which="both")
 
@@ -897,14 +702,31 @@ def calculate_error_metrics(
 
 
 def save_species_error_statistics(
-    species_errors: np.ndarray, species_list: list, output_dir: Path
+    species_errors: np.ndarray, species_list: list, output_dir: Path, pca: PCA, max_element_errors: np.ndarray
 ) -> None:
     """Save species error statistics to JSON file."""
     print("Saving species error statistics...")
 
     sorted_indices = np.argsort(species_errors)[::-1]
 
+    # Calculate cumulative explained variance
+    cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+
+    # Get top 5 element errors (highest max element errors)
+    sorted_element_errors = np.sort(max_element_errors)[::-1]
+    top_5_element_errors = [float(err) for err in sorted_element_errors[:5]]
+
     statistics = {
+        "pca_variance": {
+            "n_components": int(pca.n_components_),
+            "explained_variance_ratio": [
+                float(val) for val in pca.explained_variance_ratio_
+            ],
+            "cumulative_explained_variance": [
+                float(val) for val in cumulative_variance
+            ],
+            "total_variance_explained": float(cumulative_variance[-1]),
+        },
         "summary": {
             "total_species": len(species_list),
             "mean_mape": float(species_errors.mean()),
@@ -931,6 +753,7 @@ def save_species_error_statistics(
             }
             for i in range(min(20, len(species_list)))
         ],
+        "top_5_element_errors": top_5_element_errors,
         "all_species_errors": {
             species_list[i]: float(species_errors[i]) for i in range(len(species_list))
         },
@@ -972,19 +795,13 @@ def generate_visualizations(
         log_scale=True,
     )
 
-    # t-SNE with filtered max element errors for better visualization
-    threshold = np.percentile(max_element_errors, 99.5)
-    mask = max_element_errors <= threshold
-    print(
-        f"Filtering max errors: removing {(~mask).sum()} outliers above {threshold:.2f}%"
-    )
-
+    # t-SNE with max element errors (no filtering)
     plot_tsne_with_errors(
         train_pca,
-        val_pca[mask],
-        max_element_errors[mask],
+        val_pca,
+        max_element_errors,
         train_densities,
-        [val_densities[i] for i in range(len(val_densities)) if mask[i]],
+        val_densities,
         output_dir,
         error_label="Max Element Error (%)",
         filename="tsne_manifold_max_errors.png",
@@ -1004,6 +821,15 @@ def generate_visualizations(
         val_data,
         trajectory_errors,
         cfg,
+        output_dir,
+    )
+
+    # Combined t-SNE plot with density coloring
+    plot_tsne_combined_density(
+        train_pca,
+        val_pca,
+        train_densities,
+        val_densities,
         output_dir,
     )
 
@@ -1092,7 +918,9 @@ def run_analysis(cfg: DictConfig, output_dir: Path):
     print_error_summary(error_summary, species_errors, get_species_list(cfg))
 
     # Save species statistics to JSON
-    save_species_error_statistics(species_errors, get_species_list(cfg), output_dir)
+    save_species_error_statistics(
+        species_errors, get_species_list(cfg), output_dir, pca, max_element_errors
+    )
 
     # Generate all visualizations
     generate_visualizations(
@@ -1118,6 +946,7 @@ def run_analysis(cfg: DictConfig, output_dir: Path):
 
 @hydra.main(config_path="../../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    """Main entrypoint function."""
     # Set Hydra output directory to project outputs
     import os
 
