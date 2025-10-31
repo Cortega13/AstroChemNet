@@ -15,7 +15,17 @@ __pycache__/
 *.csv
 *.pt
 .vscode/
-outputs/*
 
 *.egg-info
 cache/*
+
+# kilocode ignore files
+.ruff_cache/
+__pycache__/
+*.egg-info
+*.pyc
+utils/
+*.ipynb
+
+outputs/*.log
+outputs/*.yaml

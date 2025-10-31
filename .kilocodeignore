@@ -4,7 +4,8 @@
 __pycache__/
 *.egg-info
 *.pyc
-outouts/
 utils/
 *.ipynb
-outputs/
+
+outputs/*.log
+outputs/*.yaml
