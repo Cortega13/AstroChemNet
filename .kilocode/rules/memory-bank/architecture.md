@@ -16,216 +16,110 @@ Entry Points   YAML Files    HDF5 Loading     Trainer Classes   Production Use
 
 ### 1. CLI System (`src/AstroChemNet/cli/`)
 
-**Purpose:** Command-line interface for training and preprocessing
-
 **Entry Points:**
 - `train_autoencoder.py` - Autoencoder training workflow
 - `train_emulator.py` - Emulator training workflow
 - `preprocess.py` - Data preprocessing utilities
 
-**Pattern:** Each CLI script uses Hydra decorators to load configurations, orchestrates setup via helper functions, and delegates training to specialized trainer classes.
+**Pattern:** Hydra decorators load configs, delegate to trainer classes.
 
-**Registration:** Automatic via `pyproject.toml` entry points:
-```toml
-[project.scripts]
-astrochemnet-train-autoencoder = "AstroChemNet.cli.train_autoencoder:main"
-astrochemnet-train-emulator = "AstroChemNet.cli.train_emulator:main"
-```
+**Registration:** `pyproject.toml` entry points → `astrochemnet-train-*` commands
 
 ### 2. Configuration System
 
 **Technology:** Hydra with structured configs (dataclasses)
 
-**Schema Definitions** (`config_schemas.py`):
-- `DatasetConfig` - Dataset paths, physical parameters, species lists, device settings
-- `ModelsConfig` - Unified schema for both models using Optional fields
-- `Config` - Top-level composition
+**Schemas** (`config_schemas.py`): `DatasetConfig`, `ModelsConfig`, `Config`
 
-**File Structure:**
+**Structure:**
 ```
 configs/
-├── config.yaml              # Autoencoder defaults
-├── config_emulator.yaml     # Emulator defaults
-├── datasets/
-│   └── grav.yaml           # Dataset-specific settings
-└── models/
-    ├── autoencoder.yaml    # Model hyperparameters
-    └── emulator.yaml       # Model hyperparameters
+├── config.yaml / config_emulator.yaml
+├── datasets/grav.yaml
+└── models/autoencoder.yaml / emulator.yaml
 ```
 
-**Design Pattern:** Composition over inheritance - combine dataset + model configs via Hydra groups, override via CLI.
+**Pattern:** Composition via Hydra groups, CLI overrides
 
 ### 3. Data Pipeline
 
 **Loading** (`data_loading.py`):
-- `load_datasets()` - HDF5 file reading with chunked access
-- `ChunkedShuffleSampler` - Memory-efficient shuffling for large datasets
-- `EmulatorSequenceDataset` - Sequential time-series indexing
-- `__getitems__` batching for 10³× speedup
+- `load_datasets()` - HDF5 chunked access
+- `ChunkedShuffleSampler` - Memory-efficient shuffling
+- `EmulatorSequenceDataset` - Time-series indexing
+- `__getitems__` batching (10³× speedup)
 
 **Processing** (`data_processing.py`):
-- `Processing` class - Static methods for scaling and normalization
-- `abundances_scaling()` - Log10 transformation with clipping
-- `save_latents_minmax()` - Latent space normalization and caching
+- `Processing` - Scaling/normalization static methods
+- `abundances_scaling()` - Log10 transform + clipping
+- `save_latents_minmax()` - Latent normalization + caching
 
-**Caching Strategy:**
-- Preprocessed data saved to disk (`.pt` for autoencoder, `.h5` for emulator)
-- Mode flags control preprocess/train/both workflow
-- Avoids redundant computation across experiments
+**Caching:** `.pt` (autoencoder) / `.h5` (emulator), mode flags control preprocess/train/both
 
 ### 4. Training Infrastructure (`trainer.py`)
 
-**Base `Trainer` Class:**
-- Abstract training loop with hooks for customization
-- Early stopping via validation plateau detection (patience=20)
-- Learning rate scheduling (ReduceLROnPlateau)
-- Gradient clipping for stability
-- Adaptive dropout reduction on training plateau
-- JSON metrics logging per epoch
-- Best model checkpointing
+**Base `Trainer`:**
+- Early stopping (patience=20), LR scheduling, gradient clipping
+- Adaptive dropout reduction, JSON metrics, checkpointing
 
-**Specialized Trainers:**
-- `AutoencoderTrainer` - Standard reconstruction training
-- `EmulatorTrainerSequential` - Autoregressive sequence prediction with rollout
+**Specialized:** `AutoencoderTrainer`, `EmulatorTrainerSequential` (autoregressive rollout)
 
-**Pattern:** Template method - base class defines workflow structure, subclasses implement model-specific logic in hooks.
+**Pattern:** Template method - base workflow, subclass hooks
 
 ### 5. Model Definitions (`models/`)
 
-**Organization:**
-- `autoencoder.py` - Tied-weight autoencoder architecture
+- `autoencoder.py` - Tied-weight architecture
 - `emulator.py` - Residual prediction network
 
-**Design Principles:**
-- Models are pure PyTorch modules (nn.Module subclasses)
-- Pretrained weight loading via static methods
-- Device-agnostic initialization
-- Inference mode support (frozen weights, eval mode)
+**Design:** Pure PyTorch modules, device-agnostic, pretrained loading
 
 ### 6. Loss Functions (`loss.py`)
 
-**Training Loss:**
-- Multi-objective: reconstruction + worst-species penalty + conservation
-- Exponential weighting emphasizes large errors
-- Stoichiometric matrix enforces elemental conservation
+**Training:** Multi-objective (reconstruction + worst-species penalty + conservation)
 
-**Validation Loss:**
-- Per-species relative error (333-D vector)
-- Used for early stopping decisions
+**Validation:** Per-species relative error (333-D) for early stopping
 
-**Pattern:** Loss functions are pure functions taking model outputs and targets, enabling easy experimentation.
+**Pattern:** Pure functions for easy experimentation
 
 ### 7. Inference API (`inference.py`)
 
-**`Inference` Class:**
-- High-level interface for production use
-- Methods: `encode()`, `decode()`, `latent_emulate()`, `emulate()`
-- Automatic preprocessing/postprocessing
-- Pretrained model loading
+**`Inference` Class:** Production interface with `encode()`, `decode()`, `latent_emulate()`, `emulate()`
 
-**Usage Pattern:**
 ```python
 inf = Inference(dataset_cfg, processing, autoencoder, emulator)
 predictions = inf.emulate(physical_params, initial_abundances)
 ```
 
-### 8. Analysis Tools (`analysis.py`, `scripts/`)
+### 8. Analysis Tools
 
-**Components:**
-- `analysis.py` - Plotting helpers and metric calculations
-- `scripts/models/` - Jupyter notebooks for error analysis
-- `scripts/datasets/` - Dataset exploration notebooks
+- `analysis.py` - Plotting/metrics
+- `scripts/models/` - Error analysis notebooks
+- `scripts/datasets/` - Dataset exploration
 
 ## Critical Implementation Paths
 
-### Training Workflow
+**Autoencoder:** CLI → `@hydra.main` → `setup_config()` → `load_datasets()` → `Processing.abundances_scaling()` → `AutoencoderTrainer.train()` → Save `weights/autoencoder.pth`, `utils/latents_minmax.npy`
 
-**Autoencoder Pipeline:**
-```
-astrochemnet-train-autoencoder (CLI)
-  ↓
-train_autoencoder.py:main() [@hydra.main decorator]
-  ↓
-setup_config() [load species, stoichiometric matrix, add to cfg]
-  ↓
-load_datasets() [HDF5 → PyTorch tensors]
-  ↓
-Processing.abundances_scaling() [clip + log10 + normalize]
-  ↓
-AutoencoderTrainer.train() [training loop with early stopping]
-  ↓
-Save: weights/autoencoder.pth, utils/latents_minmax.npy
-```
+**Emulator:** CLI → Load pretrained → Encode datasets → Save sequences → `EmulatorTrainerSequential.train()` → Save `weights/mlp.pth`
 
-**Emulator Pipeline:**
-```
-astrochemnet-train-emulator (CLI)
-  ↓
-train_emulator.py:main() [@hydra.main decorator]
-  ↓
-Load pretrained autoencoder
-  ↓
-Encode datasets to latent space
-  ↓
-Save encoded sequences to HDF5
-  ↓
-EmulatorTrainerSequential.train() [autoregressive rollout]
-  ↓
-Save: weights/mlp.pth
-```
-
-### Inference Workflow
-
-```
-User code
-  ↓
-Inference(cfg, processing, models)
-  ↓
-inf.emulate(phys_params, abundances)
-  ↓
-  encode(abundances) → latent
-  ↓
-  for timestep: latent = latent + emulator(phys, latent)
-  ↓
-  decode(latent) → abundances
-```
+**Inference:** `Inference(cfg, processing, models)` → `inf.emulate()` → encode → autoregressive rollout → decode
 
 ## File Organization
 
-**Core Package:**
 ```
 src/AstroChemNet/
-├── cli/                      # Command-line entry points
-│   ├── train_autoencoder.py
-│   ├── train_emulator.py
-│   └── preprocess.py
-├── models/                   # Neural network architectures
-│   ├── autoencoder.py
-│   └── emulator.py
-├── config_schemas.py         # Structured config dataclasses
-├── trainer.py                # Base trainer + specialized trainers
-├── loss.py                   # Loss function implementations
-├── data_loading.py           # HDF5 loading + Dataset classes
-├── data_processing.py        # Preprocessing utilities
-├── inference.py              # Production inference API
-├── analysis.py               # Plotting and metrics
-└── utils.py                  # Helper functions
-```
+├── cli/                      # train_autoencoder.py, train_emulator.py, preprocess.py
+├── models/                   # autoencoder.py, emulator.py
+├── config_schemas.py         # Structured configs
+├── trainer.py                # Base + specialized trainers
+├── loss.py, data_loading.py, data_processing.py, inference.py, analysis.py, utils.py
 
-**Data Storage:**
-```
-data/                         # HDF5 datasets + preprocessed caches
+data/                         # HDF5 + preprocessed caches
 weights/                      # Model checkpoints
 utils/                        # Static arrays (species, matrices)
-configs/                      # Hydra YAML configurations
+configs/                      # Hydra YAMLs
 outputs/                      # Training logs (timestamped)
-```
-
-**Analysis:**
-```
-scripts/models/               # Model error analysis notebooks
-scripts/datasets/             # Dataset visualization notebooks
-research/                     # Exploratory experiments
+scripts/                      # Notebooks (models/, datasets/)
 ```
 
 ## Key Design Patterns
