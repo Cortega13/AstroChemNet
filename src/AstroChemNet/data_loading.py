@@ -1,4 +1,4 @@
-"""Here we define several data loading methods needed for loading the datasets onto cpu memory and then loading them in batches for the Trainer class."""
+"""Data loading utilities for training and inference."""
 
 import gc
 import os
@@ -12,26 +12,27 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 
+def _load_hdf5_split(path: str, key: str, max_len: Optional[int] = None) -> np.ndarray:
+    """Load single HDF5 split and convert to numpy array."""
+    return (
+        pd.read_hdf(path, key, start=0, stop=max_len)
+        .astype(np.float32)
+        .to_numpy(copy=False)
+    )
+
+
 def load_dataset(
     dataset_cfg: DictConfig,
     max_len: Optional[int] = None,
     total: bool = False,
-) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
-    """Datasets are loaded from hdf5 files, filtered to only contain the columns of interest, and converted to np arrays for speed."""
-    training_dataset = pd.read_hdf(
-        dataset_cfg.dataset_path, "train", start=0, stop=max_len
-    ).astype(np.float32)
-    validation_dataset = pd.read_hdf(
-        dataset_cfg.dataset_path, "val", start=0, stop=max_len
-    ).astype(np.float32)
-
-    training_np = training_dataset.to_numpy(copy=False)
-    validation_np = validation_dataset.to_numpy(copy=False)
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Load datasets from HDF5 files and convert to numpy arrays."""
+    training_np = _load_hdf5_split(dataset_cfg.dataset_path, "train", max_len)
+    validation_np = _load_hdf5_split(dataset_cfg.dataset_path, "val", max_len)
 
     gc.collect()
     if total:
-        combined = np.concatenate((training_np, validation_np), axis=0)
-        return combined
+        return np.concatenate((training_np, validation_np), axis=0)
 
     return training_np, validation_np
 
@@ -53,15 +54,13 @@ def load_tensors_from_hdf5(
     """Load saved tensors to quickly run an emulator training session."""
     dataset_path = os.path.join(working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
-        dataset = f["dataset"][:]  # type: ignore
-        indices = f["indices"][:]  # type: ignore
-    dataset = torch.from_numpy(dataset).float()
-    indices = torch.from_numpy(indices).int()
-    return dataset, indices
+        dataset = f["dataset"][:]  # type: ignore[index]
+        indices = f["indices"][:]  # type: ignore[index]
+    return torch.from_numpy(dataset).float(), torch.from_numpy(indices).int()
 
 
 class ChunkedShuffleSampler(Sampler):
-    """During training, we want to shuffle the data in chunks for efficiency. This is especially important when our dataset size is similar to our RAM limits."""
+    """Shuffle data in chunks for memory efficiency."""
 
     def __init__(self, data_size: int, chunk_size: int, seed: int = 13):
         super().__init__()
@@ -76,8 +75,6 @@ class ChunkedShuffleSampler(Sampler):
             end = min(start + self.chunk_size, self.data_size)
             self.chunks.append((start, end))
             start = end
-
-        self.generator = torch.Generator()
 
     def set_epoch(self, epoch: int) -> None:
         """Set the current epoch for reproducible shuffling."""
@@ -108,33 +105,27 @@ class ChunkedShuffleSampler(Sampler):
 class AutoencoderDataset(Dataset):
     """Tensor Dataset for autoencoder training.
 
-    Uses the "__getitems__" method which can load all elements in a batch at once.
-    Since our batch sizes are ~10^3, instead of having ~10^3 calls to this function we only have 1.
+    Uses __getitems__ for efficient batch loading (~10^3x speedup).
     """
 
-    def __init__(
-        self,
-        data_matrix: torch.Tensor,
-    ):
+    def __init__(self, data_matrix: torch.Tensor):
         self.data_matrix = data_matrix
-        data_matrix_size = self.data_matrix.nbytes / (1024**2)
-        print(f"Data_matrix Memory usage: {data_matrix_size:.3f} MB")
+        self.size = len(data_matrix)
+        print(f"Data_matrix Memory usage: {data_matrix.nbytes / (1024**2):.3f} MB")
 
     def __len__(self) -> int:
-        return len(self.data_matrix)
+        return self.size
 
-    def __getitems__(self, indices: list[int]) -> tuple[torch.Tensor, int]:
+    def __getitems__(self, indices: list[int]) -> torch.Tensor:
+        """Load multiple samples at once for efficient batching."""
         tensor_indices = torch.tensor(indices, dtype=torch.long)
-        features = self.data_matrix[tensor_indices]
-        return features, 1
+        return self.data_matrix[tensor_indices]
 
 
 class EmulatorSequenceDataset(Dataset):
-    """Tensor Dataset for emulator training.
+    """Tensor Dataset for emulator training with sequence indexing.
 
-    Uses the "__getitems__" method which can load multiple rows of data at once.
-    Since we reuse rows of data for elements of the training dataset, we can recall the rows on the fly for batches.
-    This reduces memory overhead significantly.
+    Uses __getitems__ to reuse rows across training elements, reducing memory overhead.
     """
 
     def __init__(
@@ -144,8 +135,6 @@ class EmulatorSequenceDataset(Dataset):
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ):
-        # self.data_matrix = data_matrix.to(self.device).contiguous()
-        # self.data_indices = data_indices.to(self.device).contiguous()
         self.data_matrix = data_matrix.contiguous()
         self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
@@ -154,12 +143,8 @@ class EmulatorSequenceDataset(Dataset):
         self.num_species = dataset_cfg.num_species
         self.num_latents = autoencoder_cfg.latent_dim
 
-        data_matrix_size = self.data_matrix.nbytes / (1024**2)
-        indices_matrix_size = self.data_indices.nbytes / (1024**2)
-
-        print(f"Data_matrix Memory usage: {data_matrix_size:.3f} MB")
-        print(f"Indices_matrix Memory usage: {indices_matrix_size:.3f} MB")
-
+        print(f"Data_matrix Memory usage: {data_matrix.nbytes / (1024**2):.3f} MB")
+        print(f"Indices_matrix Memory usage: {data_indices.nbytes / (1024**2):.3f} MB")
         print(f"Dataset Size: {len(data_indices)}\n")
 
     def __len__(self) -> int:
@@ -168,10 +153,8 @@ class EmulatorSequenceDataset(Dataset):
     def __getitems__(
         self, indices: list[int]
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # indices = torch.tensor(indices, dtype=torch.long, device=self.device)
-
+        """Load sequence data for multiple samples efficiently."""
         data_indices = self.data_indices[indices]
-
         rows = self.data_matrix[data_indices]
 
         physical_parameters = rows[
@@ -183,33 +166,20 @@ class EmulatorSequenceDataset(Dataset):
         return physical_parameters, features, targets
 
 
-def collate_function(
-    batch: tuple[torch.Tensor, ...] | tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-) -> tuple[torch.Tensor, ...]:
-    """The collate_function usually pulls from the Tensor Dataset in (features, targets) format. Here we account for the physical parameters as well."""
-    if len(batch) == 2:
-        features, targets = batch
-        return features, targets
-
-    physical_parameters, features, targets = batch
-    return physical_parameters, features, targets
-
-
 def tensor_to_dataloader(
     model_cfg: DictConfig,
     torchDataset: AutoencoderDataset | EmulatorSequenceDataset,
 ) -> DataLoader:
-    """Create a DataLoader for the given Torch Dataset."""
+    """Create a DataLoader with chunked shuffling for memory efficiency."""
     data_size = len(torchDataset)
     multiplier = model_cfg.shuffle_chunk_size
-    sampler = ChunkedShuffleSampler(data_size, chunk_size=multiplier * data_size)
-    dataloader = DataLoader(
+    sampler = ChunkedShuffleSampler(data_size, chunk_size=int(multiplier * data_size))
+
+    return DataLoader(
         torchDataset,
         batch_size=model_cfg.batch_size,
         pin_memory=True,
-        num_workers=10,
+        num_workers=getattr(model_cfg, "num_workers", 10),
         in_order=False,
         sampler=sampler,
-        collate_fn=collate_function,  # type:ignore
     )
-    return dataloader

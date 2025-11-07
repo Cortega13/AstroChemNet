@@ -702,7 +702,11 @@ def calculate_error_metrics(
 
 
 def save_species_error_statistics(
-    species_errors: np.ndarray, species_list: list, output_dir: Path, pca: PCA, max_element_errors: np.ndarray
+    species_errors: np.ndarray,
+    species_list: list,
+    output_dir: Path,
+    pca: PCA,
+    max_element_errors: np.ndarray,
 ) -> None:
     """Save species error statistics to JSON file."""
     print("Saving species error statistics...")

@@ -1,7 +1,8 @@
-"""Grouped data processing functions into a single class for better organization and reusability."""
+"""Data preprocessing and postprocessing utilities for abundance scaling and transformations."""
 
 import gc
 import re
+from typing import Final
 
 import numpy as np
 import torch
@@ -10,16 +11,32 @@ from omegaconf import DictConfig
 
 from .inference import Inference
 
+# Chemical elements tracked for stoichiometric matrix
+CHEMICAL_ELEMENTS: Final[list[str]] = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
+
+# Regex patterns for element matching in species names
+ELEMENT_PATTERNS: Final[dict[str, re.Pattern]] = {
+    "H": re.compile(r"H(?!E)(\d*)"),
+    "HE": re.compile(r"HE(\d*)"),
+    "C": re.compile(r"C(?!L)(\d*)"),
+    "N": re.compile(r"N(\d*)"),
+    "O": re.compile(r"O(\d*)"),
+    "S": re.compile(r"S(?!I)(\d*)"),
+    "SI": re.compile(r"SI(\d*)"),
+    "MG": re.compile(r"MG(\d*)"),
+    "CL": re.compile(r"CL(\d*)"),
+}
+
 
 class Processing:
-    """Just for grouping functions with a similar purpose. That way they all have access to tensors which are loaded during configuration."""
+    """Handles scaling and inverse scaling transformations for physical parameters and abundances."""
 
     def __init__(
         self,
         dataset_cfg: DictConfig,
         device: str,
         autoencoder_cfg: DictConfig | None = None,
-    ):
+    ) -> None:
         self.device = device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
@@ -51,10 +68,8 @@ class Processing:
         self.num_species = dataset_cfg.num_species
         self.stoichiometric_matrix_path = dataset_cfg.stoichiometric_matrix_path
 
-    ### PreProcessing Functions
-
     def physical_parameter_scaling(self, physical_parameters: np.ndarray) -> None:
-        """Preprocesses the dataset by minmax scaling the physical parameters to be within [0, 1]."""
+        """Apply log10 and minmax scaling to physical parameters [0, 1]."""
         np.log10(physical_parameters, out=physical_parameters)
         for i, parameter in enumerate(self.physical_parameter_ranges):
             param_min, param_max = self.physical_parameter_ranges[parameter]
@@ -64,21 +79,7 @@ class Processing:
                 log_param_max - log_param_min
             )
 
-    def jit_abundances_scaling(
-        self,
-        abundances: torch.Tensor,
-    ) -> torch.Tensor:
-        """Abundances are log10'd and then minmax scaled to be within [0, 1]."""
-        abundances = torch.log10(abundances)
-        abundances = (abundances - self.abundances_min) / (
-            self.abundances_max - self.abundances_min
-        )
-        return abundances
-
-    def abundances_scaling(
-        self,
-        abundances: np.ndarray,
-    ) -> None:
+    def abundances_scaling(self, abundances: np.ndarray) -> None:
         """Abundances are log10'd and then minmax scaled to be within [0, 1]."""
         np.log10(abundances, out=abundances)
         np.subtract(abundances, self.abundances_min_np, out=abundances)
@@ -88,16 +89,11 @@ class Processing:
             out=abundances,
         )
 
-    def latent_components_scaling(
-        self,
-        components: torch.Tensor,
-    ) -> torch.Tensor:
-        """Latent components are scaled to be within [0, 1]."""
+    def latent_components_scaling(self, components: torch.Tensor) -> torch.Tensor:
+        """Scale latent components to [0, 1]."""
         return (components - self.components_min) / (
             self.components_max - self.components_min
         )
-
-    ### PostProcessing Functions
 
     def inverse_physical_parameter_scaling(
         self, physical_parameters: np.ndarray
@@ -116,62 +112,50 @@ class Processing:
 
     @staticmethod
     @torch.jit.script
-    def jit_inverse_abundances_scaling(
+    def _jit_inverse_abundances_scaling(
         abundances: torch.Tensor,
         min_: torch.Tensor,
         max_: torch.Tensor,
         exponential_: torch.Tensor,
     ) -> torch.Tensor:
-        """We use jit to compile the function so that during training there is no casting between array types and cpu/gpu.
-
-        Reverses the minmax scaling of the abundances.
-        """
+        """JIT-compiled inverse abundance scaling for GPU efficiency."""
         log_abundances = abundances * (max_ - min_) + min_
-        abundances = torch.exp(exponential_ * log_abundances)
-        return abundances
+        return torch.exp(exponential_ * log_abundances)
 
     def inverse_abundances_scaling(
         self, abundances: torch.Tensor | np.ndarray
     ) -> torch.Tensor | np.ndarray:
-        """Reverses the minmax scaling of the abundances.
-
-        Is able to handle both torch tensor or numpy inputs.
-        """
+        """Reverse minmax scaling of abundances (handles both Tensor and ndarray)."""
         if isinstance(abundances, torch.Tensor):
-            result = self.jit_inverse_abundances_scaling(
+            return self._jit_inverse_abundances_scaling(
                 abundances,
                 self.abundances_min,
                 self.abundances_max,
                 self.exponential,
             )
-            return result
-        else:
-            ab_min_np = self.abundances_min.cpu().numpy()
-            ab_max_np = self.abundances_max.cpu().numpy()
-            exponential_np = self.exponential.cpu().numpy()
 
-            np.multiply(abundances, (ab_max_np - ab_min_np), out=abundances)
-            np.add(abundances, ab_min_np, out=abundances)
-            np.exp(exponential_np * abundances, out=abundances)
-            return abundances
+        ab_min_np = self.abundances_min.cpu().numpy()
+        ab_max_np = self.abundances_max.cpu().numpy()
+        exponential_np = self.exponential.cpu().numpy()
+
+        np.multiply(abundances, (ab_max_np - ab_min_np), out=abundances)
+        np.add(abundances, ab_min_np, out=abundances)
+        np.exp(exponential_np * abundances, out=abundances)
+        return abundances
 
     @staticmethod
     @torch.jit.script
-    def jit_inverse_latent_component_scaling(
+    def _jit_inverse_latent_component_scaling(
         scaled_components: torch.Tensor, min_: torch.Tensor, max_: torch.Tensor
     ) -> torch.Tensor:
-        """We use jit to compile the function so that during training there is no casting between array types and cpu/gpu.
-
-        Reverses the latent component scaling.
-        """
+        """JIT-compiled inverse latent component scaling."""
         return scaled_components * (max_ - min_) + min_
 
     def inverse_latent_components_scaling(
-        self,
-        scaled_components: torch.Tensor,
+        self, scaled_components: torch.Tensor
     ) -> torch.Tensor:
-        """Reverses the latent component scaling."""
-        return self.jit_inverse_latent_component_scaling(
+        """Reverse latent component scaling."""
+        return self._jit_inverse_latent_component_scaling(
             scaled_components, self.components_min, self.components_max
         )
 
@@ -181,10 +165,7 @@ class Processing:
         dataset_t: torch.Tensor,
         inference_functions: Inference,
     ) -> None:
-        """For minmax scaling the latent components we need to have the minimum and maximum latent values produced by the autoencoder.
-
-        This function saves them to the path defined in the general configuration file.
-        """
+        """Compute and save min/max values of encoded latents for normalization."""
         min_, max_ = float("inf"), float("-inf")
 
         with torch.no_grad():
@@ -199,38 +180,23 @@ class Processing:
         np.save(autoencoder_cfg.latents_minmax_path, minmax_np)
 
     def build_stoichiometric_matrix(self) -> np.ndarray:
-        """Generates a stoichiometric matrix S from the species x in the dataset.
+        """Build stoichiometric matrix S where x @ S yields elemental abundances.
 
-        By doing the operation x @ S we obtain the elemental abundances n.
+        Returns (num_species, num_elements) matrix.
 
-        Returns a numpy matrix of shape (num_species, num_elements).
-
-        (Currently does not account for electrons, since they are for whatever reason not conserved by UCLCHEM. Still debugging this.)
-        (Currently does not include SURFACE or BULK since we saw no improvements for conserving them.)
+        Note: Excludes electrons (not conserved by UCLCHEM) and SURFACE/BULK species.
         """
-        elements = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
-        stoichiometric_matrix = np.zeros((len(elements), self.num_species))
+        stoichiometric_matrix = np.zeros((len(CHEMICAL_ELEMENTS), self.num_species))
         modified_species = [s.replace("@", "").replace("#", "") for s in self.species]
 
-        elements_patterns = {
-            "H": re.compile(r"H(?!E)(\d*)"),
-            "HE": re.compile(r"HE(\d*)"),
-            "C": re.compile(r"C(?!L)(\d*)"),
-            "N": re.compile(r"N(\d*)"),
-            "O": re.compile(r"O(\d*)"),
-            "S": re.compile(r"S(?!I)(\d*)"),
-            "SI": re.compile(r"SI(\d*)"),
-            "MG": re.compile(r"MG(\d*)"),
-            "CL": re.compile(r"CL(\d*)"),
-        }
-
-        for element, pattern in elements_patterns.items():
-            elem_index = elements.index(element)
-            for i, species in enumerate(modified_species):
+        for elem_idx, (element, pattern) in enumerate(ELEMENT_PATTERNS.items()):
+            for species_idx, species in enumerate(modified_species):
+                if species in ["SURFACE", "BULK"]:
+                    continue
                 match = pattern.search(species)
-                if match and species not in ["SURFACE", "BULK"]:
+                if match:
                     multiplier = int(match.group(1)) if match.group(1) else 1
-                    stoichiometric_matrix[elem_index, i] = multiplier
+                    stoichiometric_matrix[elem_idx, species_idx] = multiplier
 
         np.save(self.stoichiometric_matrix_path, stoichiometric_matrix.T)
         return stoichiometric_matrix.T
@@ -241,7 +207,7 @@ def calculate_emulator_indices(
     dataset_np: np.ndarray,
     window_size: int = 16,
 ) -> np.ndarray:
-    """The emulator training elements have significant overlap in the rows they use from the dataset."""
+    """Generate sliding window indices for emulator sequence training."""
     change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
     model_groups = np.split(dataset_np, change_indices)
 
@@ -270,7 +236,7 @@ def preprocessing_emulator_dataset(
     processing_functions: Processing,
     inference_functions: Inference,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generates index pairs for training."""
+    """Preprocess emulator dataset: scale, encode, and generate sequence indices."""
     num_species = dataset_cfg.num_species
     num_phys = dataset_cfg.num_phys
     num_metadata = dataset_cfg.num_metadata
@@ -303,4 +269,4 @@ def preprocessing_emulator_dataset(
     gc.collect()
     torch.cuda.empty_cache()
 
-    return (encoded_t, index_pairs_shuffled_t)
+    return encoded_t, index_pairs_shuffled_t
