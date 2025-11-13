@@ -21,3 +21,10 @@ Install the package using pip. Note: No necessary package dependencies are defin
 ```sh
 pip install -e .
 ```
+
+
+TODOS:
+* Map the entire trajectory to 1 parameter and then set intervals where I will use those tracer indices as validation data.
+* Train the models using this training/validation split.
+* Compare baseline of KNN and our model.
+

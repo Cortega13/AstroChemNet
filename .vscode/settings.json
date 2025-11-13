@@ -85,5 +85,10 @@
   "notebook.codeActionsOnSave": {
     "notebook.source.fixAll": "explicit",
     "notebook.source.organizeImports": "explicit"
+  },
 
+  // --- Hide ruff cache folder ---
+  "files.exclude": {
+    ".ruff_cache": true
+  }
 }
