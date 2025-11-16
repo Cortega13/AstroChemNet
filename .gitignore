@@ -30,3 +30,7 @@ utils/
 outputs/**/*.log
 outputs/**/*.yaml
 outputs/*
+
+.kilocode/
+.vscode/
+

@@ -61,6 +61,11 @@
   - `ruff format` - format code
 - Configured in `pyproject.toml`
 
+**CLI Commands** - Must be run using Python due to PATH issues
+- Installed CLI commands may not be on PATH
+- Use `python -c "from AstroChemNet.cli.module import main; main()"` to run
+- Or add the Scripts directory to PATH
+
 **Jupyter** - Interactive development
 - Notebooks in `scripts/` and `research/`
 - Error analysis and visualization

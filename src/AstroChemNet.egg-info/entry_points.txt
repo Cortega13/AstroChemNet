@@ -1,4 +1,0 @@
-[console_scripts]
-astrochemnet-preprocess = AstroChemNet.cli.preprocess:main
-astrochemnet-train-autoencoder = AstroChemNet.cli.train_autoencoder:main
-astrochemnet-train-emulator = AstroChemNet.cli.train_emulator:main
