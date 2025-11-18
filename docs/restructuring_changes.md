@@ -1,0 +1,15 @@
+- Created data/raw/ directory (though data folder left as is per user instruction)
+- Created outputs/preprocessed/, outputs/weights/, outputs/utils/ directories
+- Created entry point scripts: train.py, preprocess.py, benchmark.py at project root
+- Created astrochemnet.py for centralized PYTHONPATH setup
+- Implemented registry system: src/trainers/__init__.py, src/preprocessors/__init__.py, src/surrogates/__init__.py
+- Updated configs for Hydra composition: configs/train.yaml with defaults system
+- Updated dataset configs: configs/datasets/grav.yaml with new structure
+- Created preprocessing configs: configs/preprocessing/sequential.yaml, timeless.yaml, random.yaml
+- Created component configs: configs/components/autoencoder_grav_large.yaml, emulator_grav_sequential.yaml
+- Created surrogate configs: configs/surrogates/ae_emulator_grav.yaml
+- Refactored trainers: src/trainers/base_trainer.py, autoencoder_trainer.py, emulator_trainer.py
+- Created surrogate system: src/surrogates/base_surrogate.py, autoencoder_emulator.py
+- Removed old src/cli/ directory
+- pyproject.toml already clean (only Ruff config)
+- Added comparison scripts: scripts/compare_runs.py

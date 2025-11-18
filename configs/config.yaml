@@ -1,7 +1,23 @@
-defaults:
-  - datasets: grav
-  - models: autoencoder
-  - _self_
+# AstroChemNet Global Configuration
+# Single source of truth for paths, device, and general settings
 
-working_path: "C:\\Users\\carlo\\Projects\\AstroResearch\\AstroChemNet"
-device: cpu
+# Environment settings
+device: cuda  # Options: cuda, cpu
+working_dir: ${oc.env:PWD}
+seed: 42
+
+# Directory structure
+paths:
+  data: data
+  outputs: outputs
+  weights: ${paths.outputs}/weights
+  preprocessed: ${paths.outputs}/preprocessed
+  runs: ${paths.outputs}/runs
+  utils: ${paths.outputs}/utils
+
+# Hydra output directory settings
+hydra:
+  run:
+    dir: ${paths.runs}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}

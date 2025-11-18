@@ -1,0 +1,15 @@
+name: markovianautoregressive
+description: "Time-series aware preprocessing with sequence indexing for Markovian autoregressive emulator"
+
+# Output format
+output_format: h5  # or pt for PyTorch tensors
+compress: true
+
+# Sequence-specific settings
+preserve_time_order: true
+sequence_length: null  # Full trajectories
+create_indices: true   # For EmulatorSequenceDataset
+
+# Scaling
+apply_abundance_scaling: true
+apply_physical_scaling: true

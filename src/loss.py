@@ -3,9 +3,16 @@ import torch
 
 
 class Loss:
-    def __init__(self, processing_functions, GeneralConfig, ModelConfig=None):
-        device = GeneralConfig.device
-        stoichiometric_matrix = np.load(GeneralConfig.stoichiometric_matrix_path)
+    def __init__(self, processing_functions, dataset_cfg, model_cfg=None):
+        """Initialize loss functions with config objects.
+
+        Args:
+            processing_functions: Processing instance for scaling operations
+            dataset_cfg: Dataset configuration (DictConfig or similar)
+            model_cfg: Model/component configuration (DictConfig or similar)
+        """
+        device = processing_functions.device
+        stoichiometric_matrix = np.load(dataset_cfg.stoichiometric_matrix_path)
         self.stoichiometric_matrix = torch.tensor(
             stoichiometric_matrix, dtype=torch.float32, device=device
         )
@@ -15,12 +22,12 @@ class Loss:
             processing_functions.inverse_abundances_scaling
         )
 
-        if ModelConfig:
+        if model_cfg:
             self.power_weight = torch.tensor(
-                ModelConfig.power_weight, dtype=torch.float32, device=device
+                model_cfg.power_weight, dtype=torch.float32, device=device
             )
             self.conservation_weight = torch.tensor(
-                ModelConfig.conservation_weight, dtype=torch.float32, device=device
+                model_cfg.conservation_weight, dtype=torch.float32, device=device
             )
 
     @staticmethod

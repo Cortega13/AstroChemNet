@@ -114,7 +114,6 @@ AstroChemicalNeuralNetworks/
 │       ├── ae_emulator_grav.yaml
 │       └── direct_emulator_turbulent.yaml
 ├── data/                              # ONLY raw data
-│   └── raw/
 │       ├── gravitational_collapse.h5
 │       └── turbulent_cloud.h5
 ├── outputs/                           # ALL derived artifacts

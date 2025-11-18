@@ -1,0 +1,2 @@
+name: abundances_only
+description: "Preprocess abundances for autoencoder training: load, scale, and save as PyTorch tensors"

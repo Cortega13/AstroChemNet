@@ -1,0 +1,29 @@
+name: emulator_grav_sequential
+type: emulator
+
+# Dataset dependency
+dataset: grav
+preprocessing_method: sequential
+
+# Autoencoder dependency (weights auto-resolved)
+autoencoder_component: autoencoder_grav_large
+
+# Architecture (dims derived from autoencoder.latent_dim + dataset.n_params)
+hidden_dims: [256, 256, 128]
+
+# Hyperparameters
+lr: 1.0e-3
+lr_decay: 0.5
+lr_decay_patience: 12
+betas: [0.99, 0.999]
+weight_decay: 1.0e-4
+batch_size: 16384
+epochs: 500
+stagnant_epoch_patience: 20
+gradient_clipping: 1.0
+dropout: 0.3
+shuffle_chunk_size: 0.1
+
+# Loss weights
+power_weight: 20
+conservation_weight: 100

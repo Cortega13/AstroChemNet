@@ -1,0 +1,42 @@
+name: grav
+raw_path: data/gravitational_collapse.h5
+
+# Species information
+n_species: 333
+species_file: outputs/utils/grav/species.txt
+stoichiometric_matrix_path: outputs/utils/grav/stoichiometric_matrix.npy
+initial_abundances: outputs/utils/grav/initial_abundances.npy
+
+# Physical parameters
+physical_parameters:
+  names: [Density, Radfield, Av, gasTemp]
+  n_params: 4
+  ranges:
+    Density: [68481, 1284211415]
+    Radfield: [1.0e-4, 26]
+    Av: [0.1, 6914]
+    gasTemp: [13, 133]
+
+# Aliases for backward compatibility with Processing class
+physical_parameter_ranges:
+  Density: [68481, 1284211415]
+  Radfield: [1.0e-4, 26]
+  Av: [0.1, 6914]
+  gasTemp: [13, 133]
+
+# Data structure
+metadata_columns: [Index, Model, Time]
+columns_to_drop: [dustTemp, dstep, zeta, SURFACE, BULK]
+num_metadata: 3
+num_phys: 4
+
+# Preprocessing defaults
+abundances_clipping:
+  lower: 1.0e-20
+  upper: 1.0
+
+train_split: 0.75
+seed: 42
+
+# Dataset path for preprocessed data (set by preprocessing)
+dataset_path: null
