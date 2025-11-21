@@ -3,14 +3,13 @@
 from pathlib import Path
 from typing import cast
 
+import ....src.data_loading as dl
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 from omegaconf import DictConfig
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-
-import AstroChemNet.data_loading as dl
 
 
 def get_species_list(cfg: DictConfig) -> list:

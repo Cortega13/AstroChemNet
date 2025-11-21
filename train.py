@@ -10,7 +10,7 @@ from trainers import TRAINER_REGISTRY
 ROOT = Path(__file__).parent.resolve()
 
 
-@hydra.main(config_path=".", config_name="config", version_base=None)
+@hydra.main(config_path="configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     """Main entrypoint for training models."""
     # Component must be specified via CLI override

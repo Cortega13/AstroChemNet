@@ -9,10 +9,9 @@ import torch
 from numba import njit
 from omegaconf import DictConfig
 
-from ..data_loading import load_dataset as load_datasets
+from ..components.autoencoder import Autoencoder, load_autoencoder
 from ..data_processing import Processing
 from ..inference import Inference
-from ..models.autoencoder import Autoencoder, load_autoencoder
 
 
 @njit
@@ -86,10 +85,11 @@ def preprocess_sequences(
 
 
 class MarkovianautoregressivePreprocessor:
-    def __init__(self, dataset_cfg: DictConfig, method_cfg: DictConfig, root: Path):
-        self.dataset_cfg = dataset_cfg
-        self.method_cfg = method_cfg
-        self.root = root
+    """Preprocessor for emulator training data (Markovian autoregressive sequences)."""
+
+    def __init__(self, cfg: DictConfig):
+        """Initialize the preprocessor."""
+        self.cfg = cfg
 
     def run(self, output_dir: Path):
         """Load autoencoder, preprocess emulator sequences, and save to HDF5."""
@@ -99,29 +99,25 @@ class MarkovianautoregressivePreprocessor:
 
         # Load pretrained autoencoder for inference
         print("\nLoading pretrained autoencoder...")
-        pretrained_path = self.root / self.method_cfg.pretrained_model_path
+        pretrained_path = Path(self.cfg.pretrained_model_path)
         if not pretrained_path.exists():
             raise FileNotFoundError(
                 f"Pretrained autoencoder not found at {pretrained_path}. "
                 "Please train the autoencoder first using: astrochemnet-train-autoencoder"
             )
 
-        processing_functions = Processing(self.dataset_cfg, "cpu", self.method_cfg)
-        autoencoder = load_autoencoder(
-            Autoencoder, self.dataset_cfg, self.method_cfg, inference=True
-        )
-        inference_functions = Inference(
-            self.dataset_cfg, processing_functions, autoencoder
-        )
+        processing_functions = Processing(self.cfg, "cpu", self.cfg)
+        autoencoder = load_autoencoder(Autoencoder, self.cfg, self.cfg, inference=True)
+        inference_functions = Inference(self.cfg, processing_functions, autoencoder)
 
         # Load and preprocess datasets
         print("\nLoading and preprocessing training dataset...")
-        training_np, validation_np = load_datasets(self.dataset_cfg)
+        training_np, validation_np = load_datasets(self.cfg)
 
         print("Preprocessing training sequences...")
         training_dataset = preprocess_sequences(
-            self.dataset_cfg,
-            self.method_cfg,
+            self.cfg,
+            self.cfg,
             training_np,
             processing_functions,
             inference_functions,
@@ -129,8 +125,8 @@ class MarkovianautoregressivePreprocessor:
 
         print("Preprocessing validation sequences...")
         validation_dataset = preprocess_sequences(
-            self.dataset_cfg,
-            self.method_cfg,
+            self.cfg,
+            self.cfg,
             validation_np,
             processing_functions,
             inference_functions,

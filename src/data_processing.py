@@ -1,31 +1,8 @@
 """Data preprocessing and postprocessing utilities for abundance scaling and transformations."""
 
-import gc
-import re
-from typing import Final
-
 import numpy as np
 import torch
-from numba import njit
 from omegaconf import DictConfig
-
-from .inference import Inference
-
-# Chemical elements tracked for stoichiometric matrix
-CHEMICAL_ELEMENTS: Final[list[str]] = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
-
-# Regex patterns for element matching in species names
-ELEMENT_PATTERNS: Final[dict[str, re.Pattern]] = {
-    "H": re.compile(r"H(?!E)(\d*)"),
-    "HE": re.compile(r"HE(\d*)"),
-    "C": re.compile(r"C(?!L)(\d*)"),
-    "N": re.compile(r"N(\d*)"),
-    "O": re.compile(r"O(\d*)"),
-    "S": re.compile(r"S(?!I)(\d*)"),
-    "SI": re.compile(r"SI(\d*)"),
-    "MG": re.compile(r"MG(\d*)"),
-    "CL": re.compile(r"CL(\d*)"),
-}
 
 
 class Processing:
@@ -37,6 +14,7 @@ class Processing:
         device: str,
         autoencoder_cfg: DictConfig | None = None,
     ) -> None:
+        """Initialize Processing."""
         self.device = device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
@@ -178,25 +156,3 @@ class Processing:
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
         np.save(autoencoder_cfg.latents_minmax_path, minmax_np)
-
-    def build_stoichiometric_matrix(self) -> np.ndarray:
-        """Build stoichiometric matrix S where x @ S yields elemental abundances.
-
-        Returns (num_species, num_elements) matrix.
-
-        Note: Excludes electrons (not conserved by UCLCHEM) and SURFACE/BULK species.
-        """
-        stoichiometric_matrix = np.zeros((len(CHEMICAL_ELEMENTS), self.num_species))
-        modified_species = [s.replace("@", "").replace("#", "") for s in self.species]
-
-        for elem_idx, (element, pattern) in enumerate(ELEMENT_PATTERNS.items()):
-            for species_idx, species in enumerate(modified_species):
-                if species in ["SURFACE", "BULK"]:
-                    continue
-                match = pattern.search(species)
-                if match:
-                    multiplier = int(match.group(1)) if match.group(1) else 1
-                    stoichiometric_matrix[elem_idx, species_idx] = multiplier
-
-        np.save(self.stoichiometric_matrix_path, stoichiometric_matrix.T)
-        return stoichiometric_matrix.T

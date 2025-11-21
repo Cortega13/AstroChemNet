@@ -8,8 +8,9 @@ stoichiometric_matrix_path: outputs/utils/grav/stoichiometric_matrix.npy
 initial_abundances: outputs/utils/grav/initial_abundances.npy
 
 # Physical parameters
+phys: [Density, Radfield, Av, gasTemp]
+
 physical_parameters:
-  names: [Density, Radfield, Av, gasTemp]
   n_params: 4
   ranges:
     Density: [68481, 1284211415]

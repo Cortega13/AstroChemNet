@@ -9,8 +9,9 @@ Similar to the KNN analysis but focused on visualizing the data split structure.
 """
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
+import .data_loading as dl
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,8 +19,6 @@ import pandas as pd
 from omegaconf import DictConfig
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-
-import AstroChemNet.data_loading as dl
 
 
 def get_species_list(cfg: DictConfig) -> list:
@@ -216,7 +215,7 @@ def main(cfg: DictConfig):
     pca = PCA(n_components=50)
     pca_data = pca.fit_transform(all_data)
 
-    explained_variance = np.cumsum(pca.explained_variance_ratio_)
+    # explained_variance = np.cumsum(pca.explained_variance_ratio_)
     print(".3f")
     print(".3f")
 

@@ -122,7 +122,15 @@ class AutoencoderTrainer(BaseTrainer):
 
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
+
+        # Save to both output dir and configured path if different
         np.save(self.output_dir / "latents_minmax.npy", minmax_np)
+
+        if "latents_minmax_path" in self.cfg.component:
+            # Ensure directory exists
+            path = Path(self.cfg.component.latents_minmax_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, minmax_np)
 
     def set_dropout_rate(self, dropout_rate: float):
         """Update dropout rate for all dropout layers in the model."""
@@ -225,21 +233,12 @@ class AutoencoderTrainer(BaseTrainer):
                         f"and setting lr to {self.current_learning_rate:.4f}."
                     )
 
-            if self.stagnant_epochs == self.cfg.component.lr_decay_patience + 1:
-                if self.best_weights is not None:
-                    print("Reverting to previous best weights")
-                    self.model.load_state_dict(self.best_weights)
-
-        # Update metrics for this epoch
-        self.metrics[-1].update(
-            {
-                "mean": mean_loss,
-                "std": std_loss,
-                "max": max_loss,
-                "dropout": self.current_dropout_rate,
-                "learning_rate": self.current_learning_rate,
-            }
-        )
+            if (
+                self.stagnant_epochs == self.cfg.component.lr_decay_patience + 1
+                and self.best_weights is not None
+            ):
+                print("Reverting to previous best weights")
+                self.model.load_state_dict(self.best_weights)
 
         # Reset validation loss accumulator
         self.epoch_validation_loss.zero_()
@@ -249,7 +248,14 @@ class AutoencoderTrainer(BaseTrainer):
         print(f"Current Learning Rate: {self.optimizer.param_groups[0]['lr']:.3e}")
         print(f"Current Dropout Rate: {self.current_dropout_rate:.4f}")
 
-        return metric
+        return {
+            "val_loss": metric,
+            "mean": mean_loss,
+            "std": std_loss,
+            "max": max_loss,
+            "dropout": self.current_dropout_rate,
+            "learning_rate": self.current_learning_rate,
+        }
 
     def should_stop(self):
         """Check if training should stop due to stagnant progress."""

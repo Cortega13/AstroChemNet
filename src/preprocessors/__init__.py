@@ -1,3 +1,5 @@
+"""Preprocessor registry."""
+
 from .abundances_only import AbundancesOnlyPreprocessor
 from .initial import InitialPreprocessor
 from .markovianautoregressive import MarkovianautoregressivePreprocessor

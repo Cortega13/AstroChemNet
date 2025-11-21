@@ -4,7 +4,7 @@ import os
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 
 
 class Autoencoder(nn.Module):
@@ -18,7 +18,8 @@ class Autoencoder(nn.Module):
         noise=0.1,
         dropout=0.0,
     ):
-        super(Autoencoder, self).__init__()
+        """Initialize Autoencoder."""
+        super().__init__()
 
         self.encoder_fc1 = nn.Linear(input_dim, hidden_dims[0], bias=False)
         self.encoder_bn1 = nn.BatchNorm1d(hidden_dims[0])
@@ -49,14 +50,14 @@ class Autoencoder(nn.Module):
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Decodes the latent representation back to the input space."""
-        z = F.linear(z, self.encoder_fc3.weight.t()) + self.decoder_bias1
+        z = f.linear(z, self.encoder_fc3.weight.t()) + self.decoder_bias1
         z = self.activation(self.decoder_bn1(z))
 
-        z = F.linear(z, self.encoder_fc2.weight.t()) + self.decoder_bias2
+        z = f.linear(z, self.encoder_fc2.weight.t()) + self.decoder_bias2
         z = self.activation(self.decoder_bn2(z))
         z = self.dropout(z)
 
-        x_reconstructed = F.linear(z, self.encoder_fc1.weight.t()) + self.decoder_bias3
+        x_reconstructed = f.linear(z, self.encoder_fc1.weight.t()) + self.decoder_bias3
         x_reconstructed = self.final_activation(x_reconstructed)
         return x_reconstructed
 
@@ -71,16 +72,16 @@ class Autoencoder(nn.Module):
 
 
 def load_autoencoder(
-    Autoencoder: type[Autoencoder], GeneralConfig, model_config, inference=False
+    autoencoder_cls: type[Autoencoder], general_config, model_config, inference=False
 ):
     """Loads the autoencoder model with the given configuration."""
-    autoencoder = Autoencoder(
+    autoencoder = autoencoder_cls(
         input_dim=model_config.input_dim,
         latent_dim=model_config.latent_dim,
         hidden_dims=model_config.hidden_dims,
         noise=model_config.noise,
         dropout=model_config.dropout,
-    ).to(GeneralConfig.device)
+    ).to(general_config.device)
     if os.path.exists(model_config.pretrained_model_path):
         print("Loading Pretrained Model")
         autoencoder.load_state_dict(

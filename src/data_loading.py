@@ -1,68 +1,15 @@
 """Data loading utilities for training and inference."""
 
-import gc
-import os
-from typing import Optional
-
-import h5py
-import numpy as np
-import pandas as pd
 import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset, Sampler
-
-
-def _load_hdf5_split(path: str, key: str, max_len: Optional[int] = None) -> np.ndarray:
-    """Load single HDF5 split and convert to numpy array."""
-    return (
-        pd.read_hdf(path, key, start=0, stop=max_len)
-        .astype(np.float32)
-        .to_numpy(copy=False)
-    )
-
-
-def load_dataset(
-    dataset_cfg: DictConfig,
-    max_len: Optional[int] = None,
-    total: bool = False,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    """Load datasets from HDF5 files and convert to numpy arrays."""
-    training_np = _load_hdf5_split(dataset_cfg.dataset_path, "train", max_len)
-    validation_np = _load_hdf5_split(dataset_cfg.dataset_path, "val", max_len)
-
-    gc.collect()
-    if total:
-        return np.concatenate((training_np, validation_np), axis=0)
-
-    return training_np, validation_np
-
-
-def save_tensors_to_hdf5(
-    working_path: str, tensors: tuple[torch.Tensor, torch.Tensor], category: str
-) -> None:
-    """Save the dataset along with the encoded species and indices in tensor format."""
-    dataset, indices = tensors
-    dataset_path = os.path.join(working_path, f"data/{category}.h5")
-    with h5py.File(dataset_path, "w") as f:
-        f.create_dataset("dataset", data=dataset.numpy(), dtype=np.float32)
-        f.create_dataset("indices", data=indices.numpy(), dtype=np.int32)
-
-
-def load_tensors_from_hdf5(
-    working_path: str, category: str
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Load saved tensors to quickly run an emulator training session."""
-    dataset_path = os.path.join(working_path, f"data/{category}.h5")
-    with h5py.File(dataset_path, "r") as f:
-        dataset = f["dataset"][:]  # type: ignore[index]
-        indices = f["indices"][:]  # type: ignore[index]
-    return torch.from_numpy(dataset).float(), torch.from_numpy(indices).int()
 
 
 class ChunkedShuffleSampler(Sampler):
     """Shuffle data in chunks for memory efficiency."""
 
     def __init__(self, data_size: int, chunk_size: int, seed: int = 13):
+        """Initialize ChunkedShuffleSampler."""
         super().__init__()
         self.data_size = int(data_size)
         self.chunk_size = int(chunk_size)
@@ -81,6 +28,7 @@ class ChunkedShuffleSampler(Sampler):
         self.epoch = epoch
 
     def __iter__(self):
+        """Iterate over shuffled indices."""
         g = torch.Generator()
         g.manual_seed(self.base_seed + self.epoch)
 
@@ -99,6 +47,7 @@ class ChunkedShuffleSampler(Sampler):
             yield from chunk_perm.tolist()
 
     def __len__(self) -> int:
+        """Return the number of samples."""
         return self.data_size
 
 
@@ -109,11 +58,13 @@ class AutoencoderDataset(Dataset):
     """
 
     def __init__(self, data_matrix: torch.Tensor):
+        """Initialize AutoencoderDataset."""
         self.data_matrix = data_matrix
         self.size = len(data_matrix)
         print(f"Data_matrix Memory usage: {data_matrix.nbytes / (1024**2):.3f} MB")
 
     def __len__(self) -> int:
+        """Return the number of samples."""
         return self.size
 
     def __getitems__(self, indices: list[int]) -> torch.Tensor:
@@ -135,6 +86,7 @@ class EmulatorSequenceDataset(Dataset):
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ):
+        """Initialize EmulatorSequenceDataset."""
         self.data_matrix = data_matrix.contiguous()
         self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
@@ -148,6 +100,7 @@ class EmulatorSequenceDataset(Dataset):
         print(f"Dataset Size: {len(data_indices)}\n")
 
     def __len__(self) -> int:
+        """Return the number of samples."""
         return self.num_datapoints
 
     def __getitems__(
@@ -168,15 +121,15 @@ class EmulatorSequenceDataset(Dataset):
 
 def tensor_to_dataloader(
     model_cfg: DictConfig,
-    torchDataset: AutoencoderDataset | EmulatorSequenceDataset,
+    torch_dataset: AutoencoderDataset | EmulatorSequenceDataset,
 ) -> DataLoader:
     """Create a DataLoader with chunked shuffling for memory efficiency."""
-    data_size = len(torchDataset)
+    data_size = len(torch_dataset)
     multiplier = model_cfg.shuffle_chunk_size
     sampler = ChunkedShuffleSampler(data_size, chunk_size=int(multiplier * data_size))
 
     return DataLoader(
-        torchDataset,
+        torch_dataset,
         batch_size=model_cfg.batch_size,
         pin_memory=True,
         num_workers=getattr(model_cfg, "num_workers", 10),

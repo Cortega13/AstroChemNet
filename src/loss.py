@@ -1,8 +1,12 @@
+"""Loss functions for training."""
+
 import numpy as np
 import torch
 
 
 class Loss:
+    """Loss functions for training."""
+
     def __init__(self, processing_functions, dataset_cfg, model_cfg=None):
         """Initialize loss functions with config objects.
 
@@ -37,6 +41,7 @@ class Loss:
         exponential: torch.Tensor,
         power_weight: torch.Tensor,
     ):
+        """Calculate elementwise loss."""
         elementwise_loss = torch.abs(outputs - targets)
         elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
 

@@ -1,3 +1,5 @@
+"""Compare training runs."""
+
 import json
 from pathlib import Path
 

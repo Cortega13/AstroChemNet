@@ -2,8 +2,8 @@
 
 import json
 from pathlib import Path
-from typing import Tuple
 
+import ....src.data_loading as dl
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,8 +11,6 @@ from omegaconf import DictConfig
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.neighbors import NearestNeighbors
-
-import AstroChemNet.data_loading as dl
 
 
 def get_species_list(cfg: DictConfig) -> list:
@@ -397,7 +395,7 @@ def plot_validation_trajectory_examples(
 
         # Left panel: Chemical abundances
         colors = plt.cm.tab10(np.linspace(0, 1, len(species_indices)))  # type: ignore
-        for i, (species_idx, species_name, color) in enumerate(
+        for _i, (species_idx, species_name, color) in enumerate(
             zip(species_indices, valid_species, colors)
         ):
             # Ground truth
@@ -559,7 +557,7 @@ def plot_mape_vs_timestep(
     print(f"Saved: {output_dir / 'mape_vs_timestep.png'}")
 
 
-def load_and_prepare_data(cfg: DictConfig) -> Tuple[dict, dict, list, list]:
+def load_and_prepare_data(cfg: DictConfig) -> tuple[dict, dict, list, list]:
     """Load datasets and extract trajectory data."""
     print("\nLoading datasets...")
     training_np, validation_np = dl.load_dataset(cfg.dataset)
@@ -573,7 +571,7 @@ def load_and_prepare_data(cfg: DictConfig) -> Tuple[dict, dict, list, list]:
 
 def compute_pca_representation(
     train_trajectories: dict, val_trajectories: dict, n_components: int = 5
-) -> Tuple[PCA, np.ndarray, np.ndarray]:
+) -> tuple[PCA, np.ndarray, np.ndarray]:
     """Apply PCA to flattened trajectory data."""
     print("Applying PCA...")
     train_data = flatten_trajectories(train_trajectories)
@@ -609,7 +607,7 @@ def compute_knn_predictions(
 
 def calculate_error_metrics(
     cfg: DictConfig, pca: PCA, predicted_pca: np.ndarray, val_pca: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, dict, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict, np.ndarray, np.ndarray]:
     """Calculate comprehensive error metrics."""
     print("Calculating error metrics...")
 

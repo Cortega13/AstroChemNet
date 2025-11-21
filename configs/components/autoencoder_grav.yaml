@@ -20,8 +20,12 @@ epochs: 1000
 stagnant_epoch_patience: 20
 gradient_clipping: 2.0
 dropout: 0.3
+dropout_decay_patience: 10
+dropout_reduction_factor: 0.1
 noise: 0.1
 shuffle_chunk_size: 0.1
+
+latents_minmax_path: outputs/weights/${name}/latents_minmax.npy
 
 # Loss weights
 power_weight: 20

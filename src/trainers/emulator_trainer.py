@@ -57,9 +57,6 @@ class EmulatorTrainer(BaseTrainer):
         preprocess_dir = (
             root / f"{preprocessed_dir}/{cfg.dataset.name}/{cfg.preprocessing.name}"
         )
-        train_path = preprocess_dir / "training_seq.h5"
-        val_path = preprocess_dir / "validation_seq.h5"
-
         print(f"Loading preprocessed sequential data from {preprocess_dir}")
         training_dataset_np, training_indices = load_tensors_from_hdf5(
             str(preprocess_dir), "training_seq"
@@ -279,10 +276,12 @@ class EmulatorTrainer(BaseTrainer):
                         f"and setting lr to {self.current_learning_rate:.4f}."
                     )
 
-            if self.stagnant_epochs == self.cfg.component.lr_decay_patience + 1:
-                if self.best_weights is not None:
-                    print("Reverting to previous best weights")
-                    self.model.load_state_dict(self.best_weights)
+            if (
+                self.stagnant_epochs == self.cfg.component.lr_decay_patience + 1
+                and self.best_weights is not None
+            ):
+                print("Reverting to previous best weights")
+                self.model.load_state_dict(self.best_weights)
 
         # Update metrics for this epoch
         self.metrics[-1].update(
