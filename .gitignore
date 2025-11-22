@@ -19,7 +19,6 @@ __pycache__/
 *.egg-info
 cache/*
 
-# kilocode ignore files
 .ruff_cache/
 __pycache__/
 *.egg-info

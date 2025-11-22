@@ -1,2 +1,6 @@
-name: abundances_only
+name: autoencoder
 description: "Preprocess abundances for autoencoder training: load, scale, and save as PyTorch tensors"
+
+# Dataset config via composition
+defaults:
+  - /data: grav

@@ -1,6 +1,10 @@
 # AstroChemNet Global Configuration
 # Single source of truth for paths, device, and general settings
 
+defaults:
+  - /data: grav
+  - /preprocessing: initial  # Can override via CLI
+
 # Environment settings
 device: cuda  # Options: cuda, cpu
 working_dir: ${oc.env:PWD}
@@ -8,10 +12,13 @@ seed: 42
 
 # Directory structure
 paths:
-  data: data
+  data_dir: ${oc.env:DATA_DIR,./data}
+  weights_dir: ${oc.env:WEIGHTS_DIR,./weights}
+  preprocessed_dir: ${paths.data_dir}/preprocessed
+  initial_output: ${paths.preprocessed_dir}/initial
+  autoencoder_output: ${paths.preprocessed_dir}/autoencoder
+  sequences_output: ${paths.preprocessed_dir}/autoregressive
   outputs: outputs
-  weights: ${paths.outputs}/weights
-  preprocessed: ${paths.outputs}/preprocessed
   runs: ${paths.outputs}/runs
   utils: ${paths.outputs}/utils
 

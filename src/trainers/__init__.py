@@ -1,9 +1,9 @@
 """Trainer registry."""
 
-from trainers.autoencoder_trainer import AutoencoderTrainer
-from trainers.emulator_trainer import EmulatorTrainer
+from src.trainers.autoencoder_trainer import AutoencoderTrainer
+from src.trainers.autoregressive_trainer import AutoregressiveTrainer
 
 TRAINER_REGISTRY = {
     "autoencoder": AutoencoderTrainer,
-    "emulator": EmulatorTrainer,
+    "emulator": AutoregressiveTrainer,
 }

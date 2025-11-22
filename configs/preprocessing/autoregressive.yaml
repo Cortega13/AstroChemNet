@@ -1,0 +1,10 @@
+name: autoregressive
+description: "Time-series aware preprocessing for autoregressive emulator with 3D tensor support"
+
+# Pretrained autoencoder for encoding
+pretrained_model_path: ${paths.weights_dir}/autoencoder.pth
+
+# Dataset and model configs via composition
+defaults:
+  - /data: grav
+  - /components/autoencoder: autoencoder_grav

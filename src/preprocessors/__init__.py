@@ -1,11 +1,11 @@
 """Preprocessor registry."""
 
-from .abundances_only import AbundancesOnlyPreprocessor
+from .autoencoder import AutoencoderPreprocessor
+from .autoregressive import AutoregressivePreprocessor
 from .initial import InitialPreprocessor
-from .markovianautoregressive import MarkovianautoregressivePreprocessor
 
 PREPROCESSOR_REGISTRY = {
     "initial": InitialPreprocessor,
-    "abundances_only": AbundancesOnlyPreprocessor,
-    "markovianautoregressive": MarkovianautoregressivePreprocessor,
+    "autoencoder": AutoencoderPreprocessor,
+    "autoregressive": AutoregressivePreprocessor,
 }

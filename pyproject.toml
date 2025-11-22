@@ -13,6 +13,7 @@ select = [
     "D",
 ]
 ignore = [
+    "D417", # Arguments in docstring.
     "E501", # line too long (handled by formatter)
     "E203", # whitespace before ':' (conflicts with black/ruff format)
     "F401", # unused imports (allow for now)

@@ -10,6 +10,7 @@ autoencoder_component: autoencoder_grav_large
 
 # Architecture (dims derived from autoencoder.latent_dim + dataset.n_params)
 hidden_dims: [256, 256, 128]
+horizon: 5  # Number of timesteps to predict in sliding window
 
 # Hyperparameters
 lr: 1.0e-3

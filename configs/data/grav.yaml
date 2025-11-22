@@ -41,3 +41,6 @@ seed: 42
 
 # Dataset path for preprocessed data (set by preprocessing)
 dataset_path: null
+
+# Input directory for preprocessing steps after initial
+input_dir: ${paths.initial_output}
