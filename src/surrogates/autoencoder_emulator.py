@@ -6,10 +6,9 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 
-from components.autoencoder import Autoencoder
-from components.emulator import Emulator
-
-from ..data_processing import Processing
+from src.components.autoencoder import Autoencoder
+from src.components.emulator import Emulator
+from src.data_processing import Processing
 
 
 class AutoencoderEmulatorSurrogate:

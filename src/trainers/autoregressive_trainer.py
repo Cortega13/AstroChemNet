@@ -17,8 +17,7 @@ from src.data_loading import (
 )
 from src.data_processing import Processing
 from src.loss import Loss
-
-from .base_trainer import BaseTrainer
+from src.trainers.base_trainer import BaseTrainer
 
 
 class AutoregressiveTrainer(BaseTrainer):

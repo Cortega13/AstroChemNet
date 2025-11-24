@@ -24,15 +24,15 @@ def load_3d_tensors(cfg: DictConfig) -> tuple[torch.Tensor, torch.Tensor]:
     from pathlib import Path
 
     input_dir = Path(cfg.input_dir)
-    train_path = input_dir / "train.pt"
-    val_path = input_dir / "val.pt"
+    train_path = input_dir / "initial_train_preprocessed.pt"
+    val_path = input_dir / "initial_val_preprocessed.pt"
 
     if not train_path.exists() or not val_path.exists():
         raise FileNotFoundError(
             f"Preprocessed data not found. Expected files:\n"
             f"  - {train_path}\n"
             f"  - {val_path}\n"
-            f"Run initial preprocessing first: python preprocess.py preprocessing=initial"
+            f"Run initial preprocessing first: python preprocess.py grav initial"
         )
 
     training = torch.load(train_path)
@@ -78,7 +78,7 @@ class Processing:
                 latents_minmax[1], dtype=torch.float32, device=self.device
             )
 
-        self.physical_parameter_ranges = dataset_cfg.physical_parameter_ranges
+        self.physical_parameter_ranges = dataset_cfg.physical_parameters.ranges
         self.species = dataset_cfg.species
         self.num_species = dataset_cfg.num_species
         self.stoichiometric_matrix_path = dataset_cfg.stoichiometric_matrix_path

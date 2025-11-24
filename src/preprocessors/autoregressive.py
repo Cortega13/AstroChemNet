@@ -6,9 +6,9 @@ from pathlib import Path
 import torch
 from omegaconf import DictConfig
 
-from ..components.autoencoder import Autoencoder, load_autoencoder
-from ..data_processing import Processing, load_3d_tensors
-from ..surrogates.autoencoder_emulator import Inference
+from src.components.autoencoder import Autoencoder, load_autoencoder
+from src.data_processing import Processing, load_3d_tensors
+from src.surrogates.autoencoder_emulator import Inference
 
 
 def preprocess_sequences(
@@ -79,21 +79,19 @@ class AutoregressivePreprocessor:
                 "Please train the autoencoder first."
             )
 
-        processing_functions = Processing(self.cfg.data, "cpu", self.cfg.autoencoder)
+        processing_functions = Processing(self.cfg, "cpu", self.cfg.autoencoder)
         autoencoder = load_autoencoder(
-            Autoencoder, self.cfg.data, self.cfg.autoencoder, inference=True
+            Autoencoder, self.cfg, self.cfg.autoencoder, inference=True
         )
-        inference_functions = Inference(
-            self.cfg.data, processing_functions, autoencoder
-        )
+        inference_functions = Inference(self.cfg, processing_functions, autoencoder)
 
         # Load 3D datasets
         print("\nLoading 3D datasets...")
-        training_3d, validation_3d = load_3d_tensors(self.cfg.data)
+        training_3d, validation_3d = load_3d_tensors(self.cfg)
 
         print("\nPreprocessing training sequences...")
         training_encoded = preprocess_sequences(
-            self.cfg.data,
+            self.cfg,
             training_3d,
             processing_functions,
             inference_functions,
@@ -101,23 +99,26 @@ class AutoregressivePreprocessor:
 
         print("\nPreprocessing validation sequences...")
         validation_encoded = preprocess_sequences(
-            self.cfg.data,
+            self.cfg,
             validation_3d,
             processing_functions,
             inference_functions,
         )
 
         # Save to PyTorch tensors
+        train_filename = getattr(
+            self.cfg.output, "train_tensor", "autoregressive_train_preprocessed.pt"
+        )
+        val_filename = getattr(
+            self.cfg.output, "val_tensor", "autoregressive_val_preprocessed.pt"
+        )
+
         print("\nSaving preprocessed sequences:")
         print(f"  Training shape: {training_encoded.shape}")
         print(f"  Validation shape: {validation_encoded.shape}")
 
-        torch.save(
-            training_encoded, output_dir / "autoregressive_train_preprocessed.pt"
-        )
-        torch.save(
-            validation_encoded, output_dir / "autoregressive_val_preprocessed.pt"
-        )
+        torch.save(training_encoded, output_dir / train_filename)
+        torch.save(validation_encoded, output_dir / val_filename)
 
         print("\nPreprocessing complete!")
         del training_3d, validation_3d, training_encoded, validation_encoded

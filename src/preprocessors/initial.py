@@ -183,8 +183,15 @@ class InitialPreprocessor:
         val: torch.Tensor,
     ) -> None:
         """Saves processed tensors to .pt files."""
-        output_path_train = output_dir / "train.pt"
-        output_path_val = output_dir / "val.pt"
+        train_filename = getattr(
+            self.cfg.output, "train_tensor", "initial_train_preprocessed.pt"
+        )
+        val_filename = getattr(
+            self.cfg.output, "val_tensor", "initial_val_preprocessed.pt"
+        )
+
+        output_path_train = output_dir / train_filename
+        output_path_val = output_dir / val_filename
 
         torch.save(train, output_path_train)
         torch.save(val, output_path_val)
@@ -213,8 +220,11 @@ class InitialPreprocessor:
                     multiplier = int(match.group(1)) if match.group(1) else 1
                     stoichiometric_matrix[elem_idx, species_idx] = multiplier
 
-        output_path = output_dir / "stoichiometric_matrix.npy"
-        np.save(output_path, stoichiometric_matrix.T)
+        stoich_filename = getattr(
+            self.cfg.output, "stoichiometric_matrix", "stoichiometric_matrix.pt"
+        )
+        output_path = output_dir / stoich_filename
+        torch.save(torch.from_numpy(stoichiometric_matrix.T), output_path)
         print(f"Saved stoichiometric matrix to: {output_path}")
         return stoichiometric_matrix.T
 
@@ -224,8 +234,13 @@ class InitialPreprocessor:
         species = self._load_species()
         df = self._load_raw_data()
 
+        # rename columns and set radfield minimum
         df = self._clean_dataframe(df)
+
+        # gotta add the initial abundances to each tracer. (forgot to do this during data generation)
         df = self._process_trajectories(df, species)
+
+        # clip abundances to min of 1e-20 bc anything less than that is ODE solver tolerance.
         df = self._clip_abundances(df, species)
 
         train_tracers, val_tracers = self._get_split_tracers(df)

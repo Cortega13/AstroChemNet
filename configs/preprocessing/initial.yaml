@@ -1,2 +1,22 @@
 name: initial
-description: "Initial preprocessing of raw UCLCHEM data into cleaned HDF5 format"
+description: "Initial preprocessing of raw UCLCHEM data into cleaned 3D tensor format"
+
+# Input configuration
+input:
+  type: dataset
+  source: grav
+
+# Output configuration
+output:
+  # Primary output: 3D tensors (Tracer_idx, Timesteps, Features)
+  # Features = [Density, Radfield, Av, gasTemp] + 333 species abundances
+  train_tensor: initial_train_preprocessed.pt
+  val_tensor: initial_val_preprocessed.pt
+
+  # Stoichiometric matrix 2D matrix (Species, Atomic elements per species) for conservation checks
+  # Maps species abundances → elemental abundances: x @ S = elemental_abundances
+  stoichiometric_matrix: stoichiometric_matrix.pt
+
+# Dataset config via composition
+defaults:
+  - /data: grav

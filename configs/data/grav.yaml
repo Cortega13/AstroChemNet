@@ -1,11 +1,11 @@
 name: grav
 raw_path: data/gravitational_collapse.h5
+input_key: df
 
 # Species information
 n_species: 333
-species_file: outputs/utils/grav/species.txt
-stoichiometric_matrix_path: outputs/utils/grav/stoichiometric_matrix.npy
-initial_abundances: outputs/utils/grav/initial_abundances.npy
+species_file: data/species.txt
+initial_abundances: data/initial_abundances.npy
 
 # Physical parameters
 phys: [Density, Radfield, Av, gasTemp]
@@ -18,13 +18,6 @@ physical_parameters:
     Av: [0.1, 6914]
     gasTemp: [13, 133]
 
-# Aliases for backward compatibility with Processing class
-physical_parameter_ranges:
-  Density: [68481, 1284211415]
-  Radfield: [1.0e-4, 26]
-  Av: [0.1, 6914]
-  gasTemp: [13, 133]
-
 # Data structure
 metadata_columns: [Index, Model, Time]
 columns_to_drop: [dustTemp, dstep, zeta, SURFACE, BULK]
@@ -36,11 +29,12 @@ abundances_clipping:
   lower: 1.0e-20
   upper: 1.0
 
+# Stoichiometric matrix path (produced by initial preprocessing)
+stoichiometric_matrix_path: outputs/preprocessed/grav/initial/stoichiometric_matrix.pt
+
 train_split: 0.75
 seed: 42
 
-# Dataset path for preprocessed data (set by preprocessing)
-dataset_path: null
-
-# Input directory for preprocessing steps after initial
-input_dir: ${paths.initial_output}
+# Species list (loaded from species_file)
+# This should be populated dynamically, but including reference here
+num_species: 333
