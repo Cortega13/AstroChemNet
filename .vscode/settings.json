@@ -89,6 +89,7 @@
 
   // --- Hide ruff cache folder ---
   "files.exclude": {
-    ".ruff_cache": true
+    ".ruff_cache": true,
+    ".pytest_cache": true
   }
 }

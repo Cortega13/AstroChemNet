@@ -32,4 +32,4 @@ outputs/*
 
 .kilocode/
 .vscode/
-
+.devcontainer/
