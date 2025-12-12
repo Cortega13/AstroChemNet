@@ -1,15 +1,9 @@
 name: autoencoder_grav_large
 type: autoencoder
-
-# Dataset dependency (resolved via Hydra defaults)
 dataset: grav
-preprocessing_method: timeless
-
-# Architecture (input_dim derived from dataset.n_species)
+preprocessing_method: autoencoder
 hidden_dims: [160, 80]
 latent_dim: 14
-
-# Hyperparameters
 lr: 1.0e-3
 lr_decay: 0.5
 lr_decay_patience: 12
@@ -26,7 +20,5 @@ noise: 0.1
 shuffle_chunk_size: 0.1
 
 latents_minmax_path: outputs/weights/${name}/latents_minmax.npy
-
-# Loss weights
 power_weight: 20
 conservation_weight: 100

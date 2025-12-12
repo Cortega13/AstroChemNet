@@ -1,4 +1,4 @@
-"""Autoencoder + Emulator surrogate model."""
+"""Defines a surrogate combining an autoencoder and emulator."""
 
 from typing import Any
 
@@ -14,9 +14,8 @@ from src.data_processing import Processing
 class AutoencoderEmulatorSurrogate:
     """Surrogate model using Autoencoder + Emulator."""
 
-    def benchmark(self):
+    def benchmark(self) -> dict[str, object]:
         """Benchmark the surrogate model."""
-        # TODO: Implement autoencoder + emulator benchmarking
         return {"type": "ae_emulator", "results": "placeholder"}
 
 
@@ -41,10 +40,8 @@ class Inference:
         self.physical_parameter_scaling = (
             processing_functions.physical_parameter_scaling
         )
-        self.latent_components_scaling = processing_functions.latent_components_scaling
-        self.inverse_latent_components_scaling = (
-            processing_functions.inverse_latent_components_scaling
-        )
+        self.latents_scaling = processing_functions.latents_scaling
+        self.inverse_latents_scaling = processing_functions.inverse_latents_scaling
 
     def convert_to_tensor(
         self, inputs: np.ndarray | torch.Tensor | Any
@@ -64,30 +61,42 @@ class Inference:
             abundances_t = self.convert_to_tensor(abundances)
             return self.autoencoder.encode(abundances_t)
 
+    def _flatten_latents(
+        self, latents: torch.Tensor
+    ) -> tuple[torch.Tensor, tuple[int, int, int] | None]:
+        """Flatten 3D latents to 2D for decoding."""
+        if latents.ndim != 3:
+            return latents, None
+        batch_size, time_steps, latent_dim = latents.shape
+        original_shape = (batch_size, time_steps, -1)
+        flat = latents.view(batch_size * time_steps, latent_dim)
+        return flat, original_shape
+
+    def _decode_flat_latents(self, flat_latents: torch.Tensor) -> torch.Tensor:
+        """Decode 2D latents into abundance space."""
+        with torch.no_grad():
+            latents_t = self.convert_to_tensor(flat_latents)
+            scaled = self.autoencoder.decode(latents_t)
+            abundances = self.inverse_abundances_scaling(scaled)
+        if isinstance(abundances, torch.Tensor):
+            return abundances
+        return torch.from_numpy(abundances)
+
+    def _restore_abundance_shape(
+        self, abundances: torch.Tensor, original_shape: tuple[int, int, int] | None
+    ) -> torch.Tensor:
+        """Restore abundances to their original shape if needed."""
+        if original_shape is None:
+            return abundances
+        return abundances.view(*original_shape)
+
     def decode(self, latents: torch.Tensor) -> torch.Tensor:
         """Decode latent representations back to chemical abundances."""
         if self.autoencoder is None:
             raise ValueError("Autoencoder model not initialized")
-
-        reshaped = latents.ndim == 3
-        original_shape: tuple[int, int, int] | None = None
-        if reshaped:
-            batch_size, time_steps, latent_dim = latents.shape
-            original_shape = (batch_size, time_steps, -1)
-            latents = latents.view(batch_size * time_steps, latent_dim)
-
-        with torch.no_grad():
-            latents_t = self.convert_to_tensor(latents)
-            scaled = self.autoencoder.decode(latents_t)
-            abundances = self.inverse_abundances_scaling(scaled)
-
-        if original_shape is not None and isinstance(abundances, torch.Tensor):
-            return abundances.view(*original_shape)
-        return (
-            abundances
-            if isinstance(abundances, torch.Tensor)
-            else torch.from_numpy(abundances)
-        )
+        flat_latents, original_shape = self._flatten_latents(latents)
+        abundances = self._decode_flat_latents(flat_latents)
+        return self._restore_abundance_shape(abundances, original_shape)
 
     def latent_emulate(
         self, phys: np.ndarray | torch.Tensor, latents: np.ndarray | torch.Tensor
@@ -98,9 +107,9 @@ class Inference:
         with torch.no_grad():
             phys_t = self.convert_to_tensor(phys)
             latents_t = self.convert_to_tensor(latents)
-            scaled_latents = self.latent_components_scaling(latents_t)
+            scaled_latents = self.latents_scaling(latents_t)
             scaled_evolved_latents = self.emulator(phys_t, scaled_latents)
-            return self.inverse_latent_components_scaling(scaled_evolved_latents)
+            return self.inverse_latents_scaling(scaled_evolved_latents)
 
     def emulate(
         self,

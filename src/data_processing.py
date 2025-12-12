@@ -1,4 +1,4 @@
-"""Data preprocessing and postprocessing utilities for abundance scaling and transformations."""
+"""Provides preprocessing and inverse-scaling utilities for model I/O."""
 
 from __future__ import annotations
 
@@ -9,18 +9,11 @@ import torch
 from omegaconf import DictConfig
 
 if TYPE_CHECKING:
-    from .surrogates.autoencoder_emulator import Inference
+    from src.surrogates.autoencoder_emulator import Inference
 
 
 def load_3d_tensors(cfg: DictConfig) -> tuple[torch.Tensor, torch.Tensor]:
-    """Load 3D tensor datasets from initial preprocessing.
-
-    Args:
-        cfg: Dataset configuration containing input_dir
-
-    Returns:
-        Tuple of (training_tensor, validation_tensor) with shape (N_tracers, N_timesteps, N_features)
-    """
+    """Load training and validation 3D tensors from disk."""
     from pathlib import Path
 
     input_dir = Path(cfg.input_dir)
@@ -45,7 +38,7 @@ def load_3d_tensors(cfg: DictConfig) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 class Processing:
-    """Handles scaling and inverse scaling transformations for physical parameters and abundances."""
+    """Handles scaling and inverse scaling for physical parameters, abundances, and latents."""
 
     def __init__(
         self,
@@ -71,10 +64,10 @@ class Processing:
         if autoencoder_cfg is not None:
             latents_minmax = np.load(autoencoder_cfg.latents_minmax_path)
             print(f"Latents MinMax: {latents_minmax[0]}, {latents_minmax[1]}")
-            self.components_min = torch.tensor(
+            self.latents_min = torch.tensor(
                 latents_minmax[0], dtype=torch.float32, device=self.device
             )
-            self.components_max = torch.tensor(
+            self.latents_max = torch.tensor(
                 latents_minmax[1], dtype=torch.float32, device=self.device
             )
 
@@ -84,7 +77,7 @@ class Processing:
         self.stoichiometric_matrix_path = dataset_cfg.stoichiometric_matrix_path
 
     def physical_parameter_scaling(self, physical_parameters: torch.Tensor) -> None:
-        """Apply log10 and minmax scaling to physical parameters [0, 1]."""
+        """Scale physical parameters into [0, 1] in-place."""
         physical_parameters.log10_()
         for i, parameter in enumerate(self.physical_parameter_ranges):
             param_min, param_max = self.physical_parameter_ranges[parameter]
@@ -94,21 +87,21 @@ class Processing:
             )
 
     def abundances_scaling(self, abundances: torch.Tensor) -> None:
-        """Abundances are log10'd and then minmax scaled to be within [0, 1]."""
+        """Scale abundances into [0, 1] in-place."""
         abundances.log10_()
         abundances.sub_(self.abundances_min)
         abundances.div_(self.abundances_max - self.abundances_min)
 
-    def latent_components_scaling(self, components: torch.Tensor) -> torch.Tensor:
-        """Scale latent components to [0, 1]."""
-        return (components - self.components_min) / (
-            self.components_max - self.components_min
+    def latents_scaling(self, latents: torch.Tensor) -> torch.Tensor:
+        """Scale latents into [0, 1]."""
+        return (latents - self.latents_min) / (
+            self.latents_max - self.latents_min
         )
 
     def inverse_physical_parameter_scaling(
         self, physical_parameters: np.ndarray
     ) -> None:
-        """Reverses the minmax scaling of the physical parameters."""
+        """Reverse physical parameter scaling in-place."""
         for i, parameter in enumerate(self.physical_parameter_ranges):
             param_min, param_max = self.physical_parameter_ranges[parameter]
             log_param_min, log_param_max = np.log10(param_min), np.log10(param_max)
@@ -128,14 +121,14 @@ class Processing:
         max_: torch.Tensor,
         exponential_: torch.Tensor,
     ) -> torch.Tensor:
-        """JIT-compiled inverse abundance scaling for GPU efficiency."""
+        """Invert abundance scaling for tensors."""
         log_abundances = abundances * (max_ - min_) + min_
         return torch.exp(exponential_ * log_abundances)
 
     def inverse_abundances_scaling(
         self, abundances: torch.Tensor | np.ndarray
     ) -> torch.Tensor | np.ndarray:
-        """Reverse minmax scaling of abundances (handles both Tensor and ndarray)."""
+        """Reverse abundance scaling for tensors or ndarrays."""
         if isinstance(abundances, torch.Tensor):
             return self._jit_inverse_abundances_scaling(
                 abundances,
@@ -155,18 +148,16 @@ class Processing:
 
     @staticmethod
     @torch.jit.script
-    def _jit_inverse_latent_component_scaling(
-        scaled_components: torch.Tensor, min_: torch.Tensor, max_: torch.Tensor
+    def _jit_inverse_latents_scaling(
+        scaled_latents: torch.Tensor, min_: torch.Tensor, max_: torch.Tensor
     ) -> torch.Tensor:
-        """JIT-compiled inverse latent component scaling."""
-        return scaled_components * (max_ - min_) + min_
+        """Invert latent scaling for tensors."""
+        return scaled_latents * (max_ - min_) + min_
 
-    def inverse_latent_components_scaling(
-        self, scaled_components: torch.Tensor
-    ) -> torch.Tensor:
-        """Reverse latent component scaling."""
-        return self._jit_inverse_latent_component_scaling(
-            scaled_components, self.components_min, self.components_max
+    def inverse_latents_scaling(self, scaled_latents: torch.Tensor) -> torch.Tensor:
+        """Reverse latent scaling."""
+        return self._jit_inverse_latents_scaling(
+            scaled_latents, self.latents_min, self.latents_max
         )
 
     def save_latents_minmax(
@@ -175,7 +166,7 @@ class Processing:
         dataset_t: torch.Tensor,
         inference_functions: Inference,
     ) -> None:
-        """Compute and save min/max values of encoded latents for normalization."""
+        """Compute and save min/max values of encoded latents."""
         min_, max_ = float("inf"), float("-inf")
 
         with torch.no_grad():
