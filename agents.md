@@ -30,3 +30,9 @@ before and after your code.
 
 Typing tips:
 - OmegaConf is not a type. The correct type for it is DictConfig, ListConfig which must be importated like from omegaconf import DictConfig, ListConfig, OmegaConf.
+
+
+
+What's been touched up and doesn't need any more fixes unless otherwise stated:
+
+- configs/*

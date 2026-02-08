@@ -109,7 +109,7 @@ class BaseTrainer:
             "total_params": self.param_count,
             "dataset": self.cfg.dataset.name,
             "preprocessing": self.cfg.preprocessing.name,
-            "component_type": self.cfg.component.type,
+            "component_type": self.cfg.component.trainingtype,
         }
         with open(self.output_dir / "summary.json", "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)

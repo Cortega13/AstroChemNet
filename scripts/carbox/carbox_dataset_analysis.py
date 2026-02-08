@@ -103,7 +103,7 @@ def _build_paths(args: argparse.Namespace) -> CarboxPaths:
     dataset_name = str(args.dataset_name)
     output_root = Path(args.output_root)
     analysis_dir = output_root / "analysis" / dataset_name
-    preprocessed_dir = output_root / "preprocessed" / dataset_name / "initial"
+    preprocessed_dir = output_root / "preprocessed" / dataset_name / "uclchem_grav"
     return CarboxPaths(
         h5_path=h5_path,
         key=str(args.key),
@@ -788,7 +788,7 @@ def _config_yaml_text(
             "  lower: 1.0e-20",
             "  upper: 1.0",
             "",
-            f"stoichiometric_matrix_path: outputs/preprocessed/{dataset_name}/initial/stoichiometric_matrix.pt",
+            f"stoichiometric_matrix_path: outputs/preprocessed/{dataset_name}/uclchem_grav/stoichiometric_matrix.pt",
             "",
             "train_split: 0.75",
             "seed: 42",
@@ -835,7 +835,7 @@ def _prepare_tensors(
         paths, renamed_columns, species
     )
     _save_split_tensor(
-        paths.preprocessed_dir / "initial_train_preprocessed.pt",
+        paths.preprocessed_dir / "uclchem_grav_train_preprocessed.pt",
         data,
         starts[train_idx],
         lengths[train_idx],
@@ -846,7 +846,7 @@ def _prepare_tensors(
         upper,
     )
     _save_split_tensor(
-        paths.preprocessed_dir / "initial_val_preprocessed.pt",
+        paths.preprocessed_dir / "uclchem_grav_val_preprocessed.pt",
         data,
         starts[val_idx],
         lengths[val_idx],

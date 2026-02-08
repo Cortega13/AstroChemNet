@@ -47,7 +47,7 @@ uclchem_grav = DatasetConfig(
     abundances_lower=1.0e-20,
     abundances_upper=1.0,
     stoichiometric_matrix_path=(
-        "outputs/preprocessed/uclchem_grav/initial/stoichiometric_matrix.pt"
+        "outputs/preprocessed/uclchem_grav/uclchem_grav/stoichiometric_matrix.pt"
     ),
     train_split=0.75,
 )
@@ -72,12 +72,13 @@ carbox_grav = DatasetConfig(
     abundances_lower=1.0e-20,
     abundances_upper=1.0,
     stoichiometric_matrix_path=(
-        "outputs/preprocessed/carbox_grav/initial/stoichiometric_matrix.pt"
+        "outputs/preprocessed/carbox_grav/uclchem_grav/stoichiometric_matrix.pt"
     ),
     train_split=0.75,
 )
 
 autoencoder_uclchem_grav = AutoencoderConfig(
+    trainingtype="autoencoder",
     name="autoencoder_uclchem_grav",
     dataset="uclchem_grav",
     preprocessing_method="autoencoder",
@@ -104,6 +105,7 @@ autoencoder_uclchem_grav = AutoencoderConfig(
 )
 
 emulator_uclchem_grav = EmulatorConfig(
+    trainingtype="emulator",
     name="emulator_uclchem_grav",
     dataset="uclchem_grav",
     preprocessing_method="autoregressive",
@@ -125,17 +127,17 @@ emulator_uclchem_grav = EmulatorConfig(
     conservation_weight=100.0,
 )
 
-initial_preprocessing = PreprocessingConfig(
-    name="initial",
+uclchem_grav_preprocessing = PreprocessingConfig(
+    name="uclchem_grav",
     input_source="uclchem_grav",
-    train_tensor="initial_train_preprocessed.pt",
-    val_tensor="initial_val_preprocessed.pt",
+    train_tensor="uclchem_grav_train_preprocessed.pt",
+    val_tensor="uclchem_grav_val_preprocessed.pt",
     stoichiometric_matrix="stoichiometric_matrix.pt",
 )
 
 autoencoder_preprocessing = PreprocessingConfig(
     name="autoencoder",
-    input_source="initial",
+    input_source="uclchem_grav",
     train_tensor="autoencoder_train_preprocessed.pt",
     val_tensor="autoencoder_val_preprocessed.pt",
     stoichiometric_matrix=None,
@@ -143,7 +145,7 @@ autoencoder_preprocessing = PreprocessingConfig(
 
 autoregressive_preprocessing = PreprocessingConfig(
     name="autoregressive",
-    input_source="initial",
+    input_source="uclchem_grav",
     train_tensor="autoregressive_train_preprocessed.pt",
     val_tensor="autoregressive_val_preprocessed.pt",
     stoichiometric_matrix=None,
@@ -183,15 +185,15 @@ class DatasetName(StrEnum):
 class PreprocessingName(StrEnum):
     """Defines supported preprocessing config names."""
 
-    initial = "initial"
+    uclchem_grav = "uclchem_grav"
     autoencoder = "autoencoder"
     autoregressive = "autoregressive"
 
     def config(self) -> PreprocessingConfig:
         """Returns the preprocessing config for this preprocessing name."""
         match self:
-            case PreprocessingName.initial:
-                return initial_preprocessing
+            case PreprocessingName.uclchem_grav:
+                return uclchem_grav_preprocessing
             case PreprocessingName.autoencoder:
                 return autoencoder_preprocessing
             case PreprocessingName.autoregressive:
@@ -263,8 +265,16 @@ def _resolve_dataset_for_preprocess(
 ) -> DatasetConfig:
     """Resolves dataset config used by the preprocessing run."""
     if autoencoder is not None:
+        if source in DatasetName.__members__:
+            source_dataset = DatasetName(source).config()
+            if source_dataset.name != autoencoder.dataset:
+                raise ValueError(
+                    f"{method.autoencoder_component} dataset does not match {source}"
+                )
         return DatasetName(autoencoder.dataset).config()
-    if method.name == "initial":
+    if method.name == "uclchem_grav":
+        return DatasetName(source).config()
+    if source in DatasetName.__members__:
         return DatasetName(source).config()
     source_method = PreprocessingName(source).config()
     return DatasetName(source_method.input_source).config()
@@ -274,7 +284,7 @@ def _resolve_input_dir(
     root: Path, dataset_name: str, method: PreprocessingConfig
 ) -> str | None:
     """Resolves the input directory path for chained preprocessing."""
-    if method.name == "initial":
+    if method.name == "uclchem_grav":
         return None
     return str(
         root / RUNTIME.paths.preprocessed_dir / dataset_name / method.input_source

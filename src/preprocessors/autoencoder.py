@@ -22,7 +22,7 @@ class AutoencoderPreprocessor:
         print("Preprocessing Autoencoder Data")
         print("=" * 80)
 
-        # Load 3D tensors from initial preprocessing
+        # Load 3D tensors from uclchem_grav preprocessing
         print("\nLoading datasets...")
         training_tensor, validation_tensor = load_3d_tensors(self.cfg)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import torch
@@ -13,15 +13,21 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from src.components.autoencoder import Autoencoder
+from src.configs import AutoencoderConfig, TrainingRunConfig
 from src.data_loading import AutoencoderDataset, tensor_to_dataloader
 from src.data_processing import Processing
 from src.loss import Loss
 from src.trainers.base_trainer import BaseTrainer
 
 
-def _resolve_preprocess_dir(cfg: Any, root: Path) -> Path:
+def _resolve_preprocess_dir(run_config: TrainingRunConfig, root: Path) -> Path:
     """Resolve the preprocessing output directory."""
-    return root / cfg.paths.preprocessed_dir / cfg.dataset.name / cfg.preprocessing.name
+    return (
+        root
+        / run_config.paths.preprocessed_dir
+        / run_config.dataset.name
+        / run_config.preprocessing.name
+    )
 
 
 def _load_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
@@ -32,17 +38,17 @@ def _load_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _build_dataloaders(
-    cfg: Any,
+    component_config: AutoencoderConfig,
     training_tensor: torch.Tensor,
     validation_tensor: torch.Tensor,
 ) -> tuple[DataLoader, DataLoader, int]:
     """Create training and validation dataloaders."""
     training_dataset = AutoencoderDataset(training_tensor)
     validation_dataset = AutoencoderDataset(validation_tensor)
-    training_dataloader = tensor_to_dataloader(cfg.component, training_dataset)
+    training_dataloader = tensor_to_dataloader(component_config, training_dataset)
     validation_dataloader = DataLoader(
         validation_dataset,
-        batch_size=cfg.component.batch_size,
+        batch_size=component_config.batch_size,
         pin_memory=True,
         num_workers=10,
         shuffle=False,
@@ -50,46 +56,50 @@ def _build_dataloaders(
     return training_dataloader, validation_dataloader, len(validation_dataset)
 
 
-def _build_model(cfg: Any, device: str) -> Autoencoder:
+def _build_model(
+    run_config: TrainingRunConfig,
+    component_config: AutoencoderConfig,
+    device: str,
+) -> Autoencoder:
     """Build the autoencoder model."""
     return Autoencoder(
-        input_dim=cfg.dataset.n_species,
-        latent_dim=cfg.component.latent_dim,
-        hidden_dims=list(cfg.component.hidden_dims),
-        noise=cfg.component.noise,
-        dropout=cfg.component.dropout,
+        input_dim=run_config.dataset.num_species,
+        latent_dim=component_config.latent_dim,
+        hidden_dims=list(component_config.hidden_dims),
+        noise=component_config.noise,
+        dropout=component_config.dropout,
     ).to(device)
 
 
-def _build_optimizer(cfg: Any, model: Autoencoder, device: str) -> optim.Optimizer:
-    """Build the optimizer for autoencoder training."""
-    return optim.AdamW(
+def _build_optimizer_scheduler(
+    component_config: AutoencoderConfig,
+    model: Autoencoder,
+    device: str,
+) -> tuple[optim.Optimizer, ReduceLROnPlateau]:
+    """Build optimizer and scheduler for autoencoder training."""
+    optimizer = optim.AdamW(
         model.parameters(),
-        lr=cfg.component.lr,
-        betas=tuple(cfg.component.betas),
-        weight_decay=cfg.component.weight_decay,
+        lr=component_config.lr,
+        betas=component_config.betas,
+        weight_decay=component_config.weight_decay,
         fused=device == "cuda",
     )
-
-
-def _build_scheduler(cfg: Any, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
-    """Build the learning rate scheduler."""
-    return ReduceLROnPlateau(
+    scheduler = ReduceLROnPlateau(
         optimizer,
         mode="min",
-        factor=cfg.component.lr_decay,
-        patience=cfg.component.lr_decay_patience,
+        factor=component_config.lr_decay,
+        patience=component_config.lr_decay_patience,
     )
+    return optimizer, scheduler
 
 
-def _build_processing(cfg: Any, device: str) -> Processing:
-    """Build processing functions for scaling."""
-    return Processing(cfg.dataset, device)
-
-
-def _build_loss(processing: Processing, cfg: Any) -> Loss:
+def _build_loss(
+    processing: Processing,
+    run_config: TrainingRunConfig,
+    component_config: AutoencoderConfig,
+) -> Loss:
     """Build the loss function wrapper."""
-    return Loss(processing, cfg.dataset, cfg.component)
+    return Loss(processing, run_config.dataset, component_config)
 
 
 def _count_parameters(model: torch.nn.Module) -> int:
@@ -97,37 +107,38 @@ def _count_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def _extract_features(batch: object) -> torch.Tensor:
-    """Extract feature tensor from a dataloader batch."""
-    if isinstance(batch, (list, tuple)):
-        return batch[0]
-    if isinstance(batch, torch.Tensor):
-        return batch
-    raise TypeError(f"Unexpected batch type: {type(batch)}")
-
-
 class AutoencoderTrainer(BaseTrainer):
     """Trains an autoencoder with reconstruction loss."""
 
-    def __init__(self, cfg: Any, root: Path) -> None:
+    def __init__(self, run_config: TrainingRunConfig, root: Path) -> None:
         """Initialize AutoencoderTrainer."""
-        super().__init__(cfg, root)
-        preprocess_dir = _resolve_preprocess_dir(cfg, root)
+        super().__init__(run_config, root)
+        self.component_config = cast(AutoencoderConfig, run_config.component)
+        preprocess_dir = _resolve_preprocess_dir(run_config, root)
         print(f"Loading preprocessed data from {preprocess_dir}")
         training_tensor, validation_tensor = _load_tensors(preprocess_dir)
         (
             self.training_dataloader,
             self.validation_dataloader,
             self.num_validation_elements,
-        ) = _build_dataloaders(cfg, training_tensor, validation_tensor)
-        model = _build_model(cfg, self.device)
+        ) = _build_dataloaders(
+            self.component_config,
+            training_tensor,
+            validation_tensor,
+        )
+        model = _build_model(run_config, self.component_config, self.device)
         self.model = model
-        self.optimizer = _build_optimizer(cfg, model, self.device)
-        self.scheduler = _build_scheduler(cfg, self.optimizer)
-        self.processing = _build_processing(cfg, self.device)
-        self.loss_fn = _build_loss(self.processing, cfg)
-        self.gradient_clipping = float(cfg.component.gradient_clipping)
-        self.epoch_validation_loss = torch.zeros(cfg.dataset.n_species).to(self.device)
+        self.optimizer, self.scheduler = _build_optimizer_scheduler(
+            self.component_config,
+            model,
+            self.device,
+        )
+        self.processing = Processing(run_config.dataset, self.device)
+        self.loss_fn = _build_loss(self.processing, run_config, self.component_config)
+        self.gradient_clipping = float(self.component_config.gradient_clipping)
+        self.epoch_validation_loss = torch.zeros(run_config.dataset.num_species).to(
+            self.device
+        )
         self.param_count = _count_parameters(self.model)
         print(f"Total Parameters: {self.param_count}")
 
@@ -145,7 +156,10 @@ class AutoencoderTrainer(BaseTrainer):
             self.model.eval()
             with torch.no_grad():
                 for batch in self.validation_dataloader:
-                    batch_features = _extract_features(batch).to(
+                    batch_features = (
+                        batch[0] if isinstance(batch, (list, tuple)) else batch
+                    )
+                    batch_features = cast(torch.Tensor, batch_features).to(
                         self.device, non_blocking=True
                     )
                     encoded = model.encode(batch_features).cpu()
@@ -154,8 +168,8 @@ class AutoencoderTrainer(BaseTrainer):
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
         np.save(self.output_dir / "latents_minmax.npy", minmax_np)
-        if self.cfg.component.latents_minmax_path:
-            path = Path(self.cfg.component.latents_minmax_path)
+        if self.component_config.latents_minmax_path:
+            path = Path(self.component_config.latents_minmax_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             np.save(path, minmax_np)
 
@@ -168,7 +182,10 @@ class AutoencoderTrainer(BaseTrainer):
         loss = torch.tensor(0.0)
         model = cast(Autoencoder, self.model)
         for batch in self.training_dataloader:
-            batch_features = _extract_features(batch).to(self.device, non_blocking=True)
+            batch_features = batch[0] if isinstance(batch, (list, tuple)) else batch
+            batch_features = cast(torch.Tensor, batch_features).to(
+                self.device, non_blocking=True
+            )
             if self.optimizer and self.model:
                 self.optimizer.zero_grad()
                 outputs = model(batch_features)
@@ -186,10 +203,12 @@ class AutoencoderTrainer(BaseTrainer):
         tic = datetime.now()
         if self.model:
             self.model.eval()
+
         model = cast(Autoencoder, self.model)
         with torch.no_grad():
             for batch in self.validation_dataloader:
-                batch_features = _extract_features(batch).to(
+                batch_features = batch[0] if isinstance(batch, (list, tuple)) else batch
+                batch_features = cast(torch.Tensor, batch_features).to(
                     self.device, non_blocking=True
                 )
                 if self.model:

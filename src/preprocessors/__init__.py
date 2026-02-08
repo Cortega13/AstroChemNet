@@ -2,10 +2,10 @@
 
 from src.preprocessors.autoencoder import AutoencoderPreprocessor
 from src.preprocessors.autoregressive import AutoregressivePreprocessor
-from src.preprocessors.initial import InitialPreprocessor
+from src.preprocessors.uclchem_grav import UclchemGravPreprocessor
 
 PREPROCESSOR_REGISTRY = {
-    "initial": InitialPreprocessor,
+    "uclchem_grav": UclchemGravPreprocessor,
     "autoencoder": AutoencoderPreprocessor,
     "autoregressive": AutoregressivePreprocessor,
 }

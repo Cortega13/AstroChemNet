@@ -32,6 +32,7 @@ class DatasetConfig:
 class AutoencoderConfig:
     """Defines autoencoder component configuration values."""
 
+    trainingtype: str
     name: str
     dataset: str
     preprocessing_method: str
@@ -63,6 +64,7 @@ class AutoencoderConfig:
 class EmulatorConfig:
     """Defines emulator component configuration values."""
 
+    trainingtype: str
     name: str
     dataset: str
     preprocessing_method: str

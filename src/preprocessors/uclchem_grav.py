@@ -1,4 +1,4 @@
-"""Initial preprocessor for raw UCLCHEM data."""
+"""UCLCHEM grav preprocessor for raw UCLCHEM data."""
 
 from __future__ import annotations
 
@@ -80,8 +80,8 @@ def rename_columns(columns):
     return new_columns
 
 
-class InitialPreprocessor:
-    """Preprocesses raw UCLCHEM data into cleaned PyTorch tensors."""
+class UclchemGravPreprocessor:
+    """Preprocesses raw UCLCHEM grav data into cleaned PyTorch tensors."""
 
     def __init__(self, cfg: Any) -> None:
         """Initialize the preprocessor."""

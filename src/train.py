@@ -11,7 +11,9 @@ ROOT = Path(__file__).parent.parent.resolve()
 def _verify_preprocessing_exists(root: Path, component_name: str) -> None:
     """Verifies the preprocessing output directory exists before training."""
     cfg = build_training_config(root, component_name)
-    preprocess_dir = root / cfg.paths.preprocessed_dir / cfg.dataset.name / cfg.preprocessing.name
+    preprocess_dir = (
+        root / cfg.paths.preprocessed_dir / cfg.dataset.name / cfg.preprocessing.name
+    )
     if not preprocess_dir.exists():
         raise ValueError(
             f"Preprocessing not found: {preprocess_dir}\n"
@@ -23,7 +25,7 @@ def run_training(component_name: str) -> None:
     """Runs training for the selected component."""
     _verify_preprocessing_exists(ROOT, component_name)
     cfg = build_training_config(ROOT, component_name)
-    trainer_cls = TRAINER_REGISTRY[cfg.component.type]
+    trainer_cls = TRAINER_REGISTRY[cfg.component.trainingtype]
     trainer = trainer_cls(cfg, ROOT)
     trainer.train()
     print(f"✓ Trained {cfg.component.name}")

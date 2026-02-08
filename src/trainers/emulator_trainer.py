@@ -34,7 +34,7 @@ def _load_ae_cfg(root: Path, component_name: str) -> AutoencoderConfig:
     """Load autoencoder component configuration."""
     ae_cfg = ComponentName(component_name).config()
     if not isinstance(ae_cfg, AutoencoderConfig):
-        raise TypeError(f"Expected autoencoder component, got {ae_cfg.type}")
+        raise TypeError(f"Expected autoencoder component, got {type(ae_cfg).__name__}")
     return ae_cfg
 
 

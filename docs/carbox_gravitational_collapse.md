@@ -2,7 +2,7 @@
 
 ## What this is
 
-This repo already has a UCLCHEM-style gravitational collapse dataset at [`data/gravitational_collapse.h5`](data/gravitational_collapse.h5:1) configured by [`configs/data/grav.yaml`](configs/data/grav.yaml:1). The Carbox dataset at [`data/carbox_gravitational_collapse.h5`](data/carbox_gravitational_collapse.h5:1) uses a different on-disk layout and column naming scheme, so it cannot be fed directly into the existing [`src.preprocessors.initial.InitialPreprocessor`](src/preprocessors/initial.py:83).
+This repo already has a UCLCHEM-style gravitational collapse dataset at [`data/gravitational_collapse.h5`](data/gravitational_collapse.h5:1) configured by [`configs/data/grav.yaml`](configs/data/grav.yaml:1). The Carbox dataset at [`data/carbox_gravitational_collapse.h5`](data/carbox_gravitational_collapse.h5:1) uses a different on-disk layout and column naming scheme, so it cannot be fed directly into the existing [`src.preprocessors.uclchem_grav.UclchemGravPreprocessor`](src/preprocessors/uclchem_grav.py:83).
 
 To make it usable for training/validation, the workflow in [`scripts/carbox_dataset_analysis.py`](scripts/carbox_dataset_analysis.py:1) does three things:
 
@@ -96,7 +96,7 @@ This is what the dataset config uses.
 
 ## Train/validation preparation
 
-The output format matches what the rest of the repo expects after “initial” preprocessing: a 3D float32 tensor shaped like:
+The output format matches what the rest of the repo expects after “uclchem_grav” preprocessing: a 3D float32 tensor shaped like:
 
 - `(n_tracers, n_timesteps + 1, n_features)`
 
@@ -112,7 +112,7 @@ The initial row is constructed as:
 - physical params set to `0`
 - abundances set from [`data/initial_abundances.npy`](data/initial_abundances.npy:1), aligned by species name
 
-Then the same “physical shift” logic used by [`src.preprocessors.initial.InitialPreprocessor.run()`](src/preprocessors/initial.py:231) is applied: physical parameters are shifted by -1 timestep so that each state has the physical conditions of the next time step.
+Then the same “physical shift” logic used by [`src.preprocessors.uclchem_grav.UclchemGravPreprocessor.run()`](src/preprocessors/uclchem_grav.py:225) is applied: physical parameters are shifted by -1 timestep so that each state has the physical conditions of the next time step.
 
 ### Split strategy
 
@@ -143,9 +143,14 @@ Running the script creates:
   - [`data/carbox_grav_species.txt`](data/carbox_grav_species.txt:1)
 
 - Preprocessed tensors and stoichiometry:
-  - [`outputs/preprocessed/carbox_grav/initial/initial_train_preprocessed.pt`](outputs/preprocessed/carbox_grav/initial/initial_train_preprocessed.pt:1)
-  - [`outputs/preprocessed/carbox_grav/initial/initial_val_preprocessed.pt`](outputs/preprocessed/carbox_grav/initial/initial_val_preprocessed.pt:1)
-  - [`outputs/preprocessed/carbox_grav/initial/stoichiometric_matrix.pt`](outputs/preprocessed/carbox_grav/initial/stoichiometric_matrix.pt:1)
+  - [`outputs/preprocessed/carbox_grav/uclchem_grav/uclchem_grav_train_preprocessed.pt`](outputs/preprocessed/carbox_grav/uclchem_grav/uclchem_grav_train_preprocessed.pt:1)
+  - [`outputs/preprocessed/carbox_grav/uclchem_grav/uclchem_grav_val_preprocessed.pt`](outputs/preprocessed/carbox_grav/uclchem_grav/uclchem_grav_val_preprocessed.pt:1)
+  - [`outputs/preprocessed/carbox_grav/uclchem_grav/stoichiometric_matrix.pt`](outputs/preprocessed/carbox_grav/uclchem_grav/stoichiometric_matrix.pt:1)
+
+## Migration note
+
+- Existing artifacts under `outputs/preprocessed/*/initial/` are obsolete after the stage rename.
+- Regenerate preprocessing outputs to create `outputs/preprocessed/*/uclchem_grav/` artifacts.
 
 ## How to run
 
