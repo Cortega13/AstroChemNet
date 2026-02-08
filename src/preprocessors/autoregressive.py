@@ -2,11 +2,12 @@
 
 import gc
 from pathlib import Path
+from typing import Any
 
 import torch
-from omegaconf import DictConfig
 
 from src.components.autoencoder import Autoencoder, load_autoencoder
+from src.configs import DatasetConfig
 from src.data_processing import Processing, load_3d_tensors
 from src.surrogates.autoencoder_emulator import Inference
 
@@ -40,7 +41,7 @@ def _encode_latents(
 
 
 def preprocess_sequences(
-    dataset_cfg: DictConfig,
+    dataset_cfg: DatasetConfig,
     dataset_3d: torch.Tensor,
     processing_functions: Processing,
     inference_functions: Inference,
@@ -62,20 +63,22 @@ def preprocess_sequences(
 class AutoregressivePreprocessor:
     """Preprocessor for emulator training data with 3D tensor support."""
 
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: Any):
         """Initialize the preprocessor."""
         self.cfg = cfg
 
     def _load_inference(self) -> tuple[Processing, Inference]:
         """Load processing and inference objects with pretrained autoencoder."""
         print("\nLoading pretrained autoencoder...")
-        pretrained_path = Path(self.cfg.pretrained_model_path)
+        if self.cfg.autoencoder is None:
+            raise ValueError("Autoencoder component config is required")
+        pretrained_path = Path(self.cfg.autoencoder.pretrained_model_path or "")
         if not pretrained_path.exists():
             raise FileNotFoundError(
                 f"Pretrained autoencoder not found at {pretrained_path}. "
                 "Please train the autoencoder first."
             )
-        processing = Processing(self.cfg, "cpu", self.cfg.autoencoder)
+        processing = Processing(self.cfg.dataset, "cpu", self.cfg.autoencoder)
         autoencoder = load_autoencoder(
             Autoencoder, self.cfg, self.cfg.autoencoder, inference=True
         )
@@ -94,12 +97,8 @@ class AutoregressivePreprocessor:
         validation_encoded: torch.Tensor,
     ) -> None:
         """Save encoded sequences to disk."""
-        train_filename = getattr(
-            self.cfg.output, "train_tensor", "autoregressive_train_preprocessed.pt"
-        )
-        val_filename = getattr(
-            self.cfg.output, "val_tensor", "autoregressive_val_preprocessed.pt"
-        )
+        train_filename = self.cfg.method.train_tensor
+        val_filename = self.cfg.method.val_tensor
         print("\nSaving preprocessed sequences:")
         print(f"  Training shape: {training_encoded.shape}")
         print(f"  Validation shape: {validation_encoded.shape}")
@@ -115,11 +114,11 @@ class AutoregressivePreprocessor:
         training_3d, validation_3d = self._load_datasets()
         print("\nPreprocessing training sequences...")
         training_encoded = preprocess_sequences(
-            self.cfg, training_3d, processing, inference
+            self.cfg.dataset, training_3d, processing, inference
         )
         print("\nPreprocessing validation sequences...")
         validation_encoded = preprocess_sequences(
-            self.cfg, validation_3d, processing, inference
+            self.cfg.dataset, validation_3d, processing, inference
         )
         self._save_outputs(output_dir, training_encoded, validation_encoded)
         print("\nPreprocessing complete!")

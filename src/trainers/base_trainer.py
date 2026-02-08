@@ -4,27 +4,26 @@ import copy
 import gc
 import json
 from abc import abstractmethod
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import torch
-from omegaconf import DictConfig, OmegaConf
 
 
 class BaseTrainer:
     """Base trainer class."""
 
-    def __init__(self, cfg: DictConfig, root: Path):
+    def __init__(self, cfg: Any, root: Path):
         """Initialize BaseTrainer."""
         self.cfg = cfg
         self.root = root
-        weights_dir = cfg.get("paths", {}).get("weights", "outputs/weights")
-        self.output_dir = root / f"{weights_dir}/{cfg.component.name}"
+        self.output_dir = root / cfg.paths.weights_dir / cfg.component.name
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Device setup
-        self.device = cfg.get("device", "cuda" if torch.cuda.is_available() else "cpu")
+        self.device = cfg.device
         if self.device == "cuda":
             torch.backends.cudnn.benchmark = True
             torch.backends.cuda.matmul.allow_tf32 = True
@@ -51,7 +50,8 @@ class BaseTrainer:
         self._setup_training()
 
         # Save config snapshot
-        OmegaConf.save(self.cfg, self.output_dir / "config.yaml")
+        with open(self.output_dir / "config.json", "w", encoding="utf-8") as handle:
+            json.dump(asdict(self.cfg), handle, indent=2)
 
         # Training loop
         for epoch in range(self.cfg.component.epochs):
@@ -99,7 +99,7 @@ class BaseTrainer:
     def _teardown_training(self):
         """Cleanup after training."""
         # Save final metrics
-        with open(self.output_dir / "metrics.json", "w") as f:
+        with open(self.output_dir / "metrics.json", "w", encoding="utf-8") as f:
             json.dump(self.metrics, f, indent=2)
 
         # Save summary
@@ -111,7 +111,7 @@ class BaseTrainer:
             "preprocessing": self.cfg.preprocessing.name,
             "component_type": self.cfg.component.type,
         }
-        with open(self.output_dir / "summary.json", "w") as f:
+        with open(self.output_dir / "summary.json", "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
 
         # Final cleanup
@@ -145,13 +145,9 @@ class BaseTrainer:
             print(f"Stagnant {self.stagnant_epochs}")
 
             # Adaptive dropout reduction
-            dropout_decay_patience = getattr(
-                self.cfg.component, "dropout_decay_patience", 10
-            )
+            dropout_decay_patience = self.cfg.component.dropout_decay_patience or 10
             if self.stagnant_epochs % dropout_decay_patience == 0:
-                reduction_factor = getattr(
-                    self.cfg.component, "dropout_reduction_factor", 0.1
-                )
+                reduction_factor = self.cfg.component.dropout_reduction_factor or 0.1
                 new_dropout = max(self.current_dropout_rate - reduction_factor, 0.0)
                 if new_dropout != self.current_dropout_rate:
                     self.stagnant_epochs = 0

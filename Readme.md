@@ -7,16 +7,16 @@ This package contains training/testing procedures for deep neural surrogate mode
 
 ```sh
 # 1) Preprocess grav data
-python preprocess.py grav initial
-python preprocess.py initial autoencoder
-python preprocess.py initial autoregressive
+python run.py preprocess grav initial
+python run.py preprocess initial autoencoder
+python run.py preprocess initial autoregressive
 
 # 2) Train models
-python train.py component=autoencoder_grav
-python train.py component=emulator_grav
+python run.py train autoencoder_grav
+python run.py train emulator_grav
 
 # 3) Benchmark combined AE + autoregressive surrogate
-python benchmark.py ae_emulator_grav
+python run.py benchmark ae_emulator_grav
 ```
 
 Weights are saved under `outputs/weights/` for each component model.

@@ -2,9 +2,9 @@
 
 import gc
 from pathlib import Path
+from typing import Any
 
 import torch
-from omegaconf import DictConfig
 
 from src.data_processing import Processing, load_3d_tensors
 
@@ -12,7 +12,7 @@ from src.data_processing import Processing, load_3d_tensors
 class AutoencoderPreprocessor:
     """Preprocessor for autoencoder training data (abundances only)."""
 
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: Any):
         """Initialize the preprocessor."""
         self.cfg = cfg
 
@@ -27,7 +27,7 @@ class AutoencoderPreprocessor:
         training_tensor, validation_tensor = load_3d_tensors(self.cfg)
 
         # Get dimensions from dataset config
-        num_phys = self.cfg.num_phys
+        num_phys = self.cfg.dataset.num_phys
 
         # Reshape to 2D: (N_tracers * N_timesteps, N_features)
         train_shape = training_tensor.shape
@@ -38,7 +38,7 @@ class AutoencoderPreprocessor:
 
         # Scale abundances (in-place modification on species columns only)
         print("Scaling abundances...")
-        processing = Processing(self.cfg, "cpu")
+        processing = Processing(self.cfg.dataset, "cpu")
         processing.abundances_scaling(training_flat[:, num_phys:])
         processing.abundances_scaling(validation_flat[:, num_phys:])
 
@@ -47,12 +47,8 @@ class AutoencoderPreprocessor:
         validation_species = validation_flat[:, num_phys:]
 
         # Save to disk
-        train_filename = getattr(
-            self.cfg.output, "train_tensor", "autoencoder_train_preprocessed.pt"
-        )
-        val_filename = getattr(
-            self.cfg.output, "val_tensor", "autoencoder_val_preprocessed.pt"
-        )
+        train_filename = self.cfg.method.train_tensor
+        val_filename = self.cfg.method.val_tensor
 
         train_path = output_dir / train_filename
         val_path = output_dir / val_filename

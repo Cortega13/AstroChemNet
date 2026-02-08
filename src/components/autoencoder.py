@@ -1,10 +1,13 @@
 """Defines the Autoencoder and loading it."""
 
 import os
+from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
+
+from src.configs import AutoencoderConfig
 
 
 class Autoencoder(nn.Module):
@@ -72,21 +75,25 @@ class Autoencoder(nn.Module):
 
 
 def load_autoencoder(
-    autoencoder_cls: type[Autoencoder], general_config, model_config, inference=False
+    autoencoder_cls: type[Autoencoder],
+    general_config: Any,
+    model_config: AutoencoderConfig,
+    inference: bool = False,
 ):
     """Loads the autoencoder model with the given configuration."""
     autoencoder = autoencoder_cls(
-        input_dim=model_config.input_dim,
+        input_dim=model_config.input_dim or 333,
         latent_dim=model_config.latent_dim,
         hidden_dims=model_config.hidden_dims,
         noise=model_config.noise,
         dropout=model_config.dropout,
     ).to(general_config.device)
-    if os.path.exists(model_config.pretrained_model_path):
+    pretrained_model_path = model_config.pretrained_model_path
+    if pretrained_model_path and os.path.exists(pretrained_model_path):
         print("Loading Pretrained Model")
         autoencoder.load_state_dict(
             torch.load(
-                model_config.pretrained_model_path, map_location=torch.device("cpu")
+                pretrained_model_path, map_location=torch.device("cpu")
             )
         )
 

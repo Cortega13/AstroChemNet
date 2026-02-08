@@ -4,43 +4,43 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Protocol, cast
 
 import torch
-from omegaconf import DictConfig, OmegaConf
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from src.components.autoencoder import Autoencoder
 from src.components.emulator import Emulator
+from src.configs import AutoencoderConfig, load_component_config
 from src.data_loading import AutoregressiveDataset, tensor_to_dataloader
 from src.data_processing import Processing
 from src.loss import Loss
 from src.trainers.base_trainer import BaseTrainer
 
 
-def _resolve_ae_paths(cfg: DictConfig, root: Path) -> tuple[Path, Path, Path]:
+def _resolve_ae_paths(cfg: Any, root: Path) -> tuple[str, Path, Path]:
     """Resolve autoencoder config, weights, and latents paths."""
     ae_component_name = cfg.component.autoencoder_component
-    ae_config_path = root / f"configs/components/{ae_component_name}.yaml"
-    weights_dir = cfg.get("paths", {}).get("weights", "outputs/weights")
-    ae_weights_path = root / f"{weights_dir}/{ae_component_name}/weights.pth"
-    ae_latents_path = root / f"{weights_dir}/{ae_component_name}/latents_minmax.npy"
-    return ae_config_path, ae_weights_path, ae_latents_path
+    ae_weights_path = root / cfg.paths.weights_dir / ae_component_name / "weights.pth"
+    ae_latents_path = (
+        root / cfg.paths.weights_dir / ae_component_name / "latents_minmax.npy"
+    )
+    return ae_component_name, ae_weights_path, ae_latents_path
 
 
-def _load_ae_cfg(ae_config_path: Path) -> DictConfig:
+def _load_ae_cfg(root: Path, component_name: str) -> AutoencoderConfig:
     """Load autoencoder component configuration."""
-    ae_cfg_raw = OmegaConf.load(ae_config_path)
-    if not isinstance(ae_cfg_raw, DictConfig):
-        raise TypeError(f"Expected DictConfig, got {type(ae_cfg_raw)}")
-    return ae_cfg_raw
+    ae_cfg = load_component_config(root, component_name)
+    if not isinstance(ae_cfg, AutoencoderConfig):
+        raise TypeError(f"Expected autoencoder component, got {ae_cfg.type}")
+    return ae_cfg
 
 
-def _resolve_preprocess_dir(cfg: DictConfig, root: Path) -> Path:
+def _resolve_preprocess_dir(cfg: Any, root: Path) -> Path:
     """Resolve preprocessing output directory."""
-    preprocessed_dir = cfg.get("paths", {}).get("preprocessed", "outputs/preprocessed")
-    return root / f"{preprocessed_dir}/{cfg.dataset.name}/{cfg.preprocessing.name}"
+    return root / cfg.paths.preprocessed_dir / cfg.dataset.name / cfg.preprocessing.name
 
 
 def _load_sequential_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
@@ -51,21 +51,21 @@ def _load_sequential_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.
 
 
 def _build_processing(
-    cfg: DictConfig, device: str, ae_cfg: DictConfig, ae_latents_path: Path
+    cfg: Any, device: str, ae_cfg: AutoencoderConfig, ae_latents_path: Path
 ) -> Processing:
     """Build processing functions including latent scaling."""
     ae_cfg.latents_minmax_path = str(ae_latents_path)
     return Processing(cfg.dataset, device, ae_cfg)
 
 
-def _build_loss(processing: Processing, cfg: DictConfig) -> Loss:
+def _build_loss(processing: Processing, cfg: Any) -> Loss:
     """Build loss for emulator training."""
     return Loss(processing, cfg.dataset, cfg.component)
 
 
 def _build_dataloaders(
-    cfg: DictConfig,
-    ae_cfg: DictConfig,
+    cfg: Any,
+    ae_cfg: AutoencoderConfig,
     training_3d: torch.Tensor,
     validation_3d: torch.Tensor,
 ) -> tuple[DataLoader, DataLoader, int]:
@@ -84,7 +84,7 @@ def _build_dataloaders(
 
 
 def _load_frozen_autoencoder(
-    cfg: DictConfig, ae_cfg: DictConfig, ae_weights_path: Path, device: str
+    cfg: Any, ae_cfg: AutoencoderConfig, ae_weights_path: Path, device: str
 ) -> Autoencoder:
     """Load a pretrained autoencoder in eval mode."""
     autoencoder = Autoencoder(
@@ -102,9 +102,9 @@ def _load_frozen_autoencoder(
     return autoencoder
 
 
-def _build_emulator_model(cfg: DictConfig, ae_cfg: DictConfig, device: str) -> Emulator:
+def _build_emulator_model(cfg: Any, ae_cfg: AutoencoderConfig, device: str) -> Emulator:
     """Build the emulator model."""
-    emulator_input_dim = cfg.dataset.physical_parameters.n_params + ae_cfg.latent_dim
+    emulator_input_dim = cfg.dataset.n_params + ae_cfg.latent_dim
     emulator_output_dim = ae_cfg.latent_dim
     return Emulator(
         input_dim=emulator_input_dim,
@@ -114,7 +114,7 @@ def _build_emulator_model(cfg: DictConfig, ae_cfg: DictConfig, device: str) -> E
     ).to(device)
 
 
-def _build_optimizer(cfg: DictConfig, model: Emulator, device: str) -> optim.Optimizer:
+def _build_optimizer(cfg: Any, model: Emulator, device: str) -> optim.Optimizer:
     """Build the optimizer for emulator training."""
     return optim.AdamW(
         model.parameters(),
@@ -125,7 +125,7 @@ def _build_optimizer(cfg: DictConfig, model: Emulator, device: str) -> optim.Opt
     )
 
 
-def _build_scheduler(cfg: DictConfig, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
+def _build_scheduler(cfg: Any, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
     """Build the learning rate scheduler."""
     return ReduceLROnPlateau(
         optimizer,
@@ -145,19 +145,34 @@ def _extract_batch(batch: object) -> tuple[torch.Tensor, torch.Tensor, torch.Ten
     return phys, features, targets
 
 
+class _HasSetEpoch(Protocol):
+    """Defines sampler interface for distributed-style epoch seeding."""
+
+    def set_epoch(self, epoch: int) -> None:
+        """Sets the current epoch for deterministic reshuffling."""
+
+
+def _maybe_set_epoch(sampler: object, epoch: int) -> None:
+    """Calls `set_epoch` on samplers that support it."""
+    if hasattr(sampler, "set_epoch"):
+        cast(_HasSetEpoch, sampler).set_epoch(epoch)
+
+
 class EmulatorTrainer(BaseTrainer):
     """Trains a latent-space autoregressive emulator."""
 
-    def __init__(self, cfg: DictConfig, root: Path) -> None:
+    def __init__(self, cfg: Any, root: Path) -> None:
         """Initialize EmulatorTrainer."""
         super().__init__(cfg, root)
-        ae_config_path, ae_weights_path, ae_latents_path = _resolve_ae_paths(cfg, root)
+        ae_component_name, ae_weights_path, ae_latents_path = _resolve_ae_paths(
+            cfg, root
+        )
         if not ae_weights_path.exists():
             raise ValueError(
                 f"Autoencoder weights not found: {ae_weights_path}\n"
-                f"Train autoencoder first: python train.py component={cfg.component.autoencoder_component}"
+                f"Train autoencoder first: python run.py train {cfg.component.autoencoder_component}"
             )
-        ae_cfg = _load_ae_cfg(ae_config_path)
+        ae_cfg = _load_ae_cfg(root, ae_component_name)
         preprocess_dir = _resolve_preprocess_dir(cfg, root)
         print(f"Loading preprocessed sequential data from {preprocess_dir}")
         training_3d, validation_3d = _load_sequential_tensors(preprocess_dir)
@@ -194,9 +209,7 @@ class EmulatorTrainer(BaseTrainer):
 
     def train_epoch(self) -> float:
         """Train the emulator for one epoch."""
-        sampler = self.training_dataloader.sampler
-        if hasattr(sampler, "set_epoch") and callable(getattr(sampler, "set_epoch")):
-            getattr(sampler, "set_epoch")(self.current_epoch)
+        _maybe_set_epoch(self.training_dataloader.sampler, self.current_epoch)
         tic = datetime.now()
         if self.model:
             self.model.train()

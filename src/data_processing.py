@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
-from omegaconf import DictConfig
 
 if TYPE_CHECKING:
+    from src.configs import AutoencoderConfig, DatasetConfig
     from src.surrogates.autoencoder_emulator import Inference
 
 
-def load_3d_tensors(cfg: DictConfig) -> tuple[torch.Tensor, torch.Tensor]:
+def load_3d_tensors(cfg: Any) -> tuple[torch.Tensor, torch.Tensor]:
     """Load training and validation 3D tensors from disk."""
     from pathlib import Path
 
@@ -25,7 +25,7 @@ def load_3d_tensors(cfg: DictConfig) -> tuple[torch.Tensor, torch.Tensor]:
             f"Preprocessed data not found. Expected files:\n"
             f"  - {train_path}\n"
             f"  - {val_path}\n"
-            f"Run initial preprocessing first: python preprocess.py grav initial"
+            f"Run initial preprocessing first: python run.py preprocess grav initial"
         )
 
     training = torch.load(train_path)
@@ -42,26 +42,28 @@ class Processing:
 
     def __init__(
         self,
-        dataset_cfg: DictConfig,
+        dataset_cfg: DatasetConfig,
         device: str,
-        autoencoder_cfg: DictConfig | None = None,
+        autoencoder_cfg: AutoencoderConfig | None = None,
     ) -> None:
         """Initialize Processing."""
         self.device = device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
         self.abundances_min = torch.tensor(
-            np.log10(dataset_cfg.abundances_clipping.lower),
+            np.log10(dataset_cfg.abundances_lower),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_max = torch.tensor(
-            np.log10(dataset_cfg.abundances_clipping.upper),
+            np.log10(dataset_cfg.abundances_upper),
             dtype=torch.float32,
             device=self.device,
         )
 
         if autoencoder_cfg is not None:
+            if autoencoder_cfg.latents_minmax_path is None:
+                raise ValueError("autoencoder.latents_minmax_path is required")
             latents_minmax = np.load(autoencoder_cfg.latents_minmax_path)
             print(f"Latents MinMax: {latents_minmax[0]}, {latents_minmax[1]}")
             self.latents_min = torch.tensor(
@@ -71,7 +73,7 @@ class Processing:
                 latents_minmax[1], dtype=torch.float32, device=self.device
             )
 
-        self.physical_parameter_ranges = dataset_cfg.physical_parameters.ranges
+        self.physical_parameter_ranges = dataset_cfg.physical_ranges
         self.species = dataset_cfg.species
         self.num_species = dataset_cfg.num_species
         self.stoichiometric_matrix_path = dataset_cfg.stoichiometric_matrix_path
@@ -160,7 +162,7 @@ class Processing:
 
     def save_latents_minmax(
         self,
-        autoencoder_cfg: DictConfig,
+        autoencoder_cfg: AutoencoderConfig,
         dataset_t: torch.Tensor,
         inference_functions: Inference,
     ) -> None:
@@ -176,4 +178,6 @@ class Processing:
 
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
+        if autoencoder_cfg.latents_minmax_path is None:
+            raise ValueError("autoencoder.latents_minmax_path is required")
         np.save(autoencoder_cfg.latents_minmax_path, minmax_np)

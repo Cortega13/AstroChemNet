@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import pandas as pd
 import torch
-from omegaconf import DictConfig, OmegaConf
+
+from src.configs import config_to_dict
 
 # Chemical elements tracked for stoichiometric matrix
 CHEMICAL_ELEMENTS: Final[list[str]] = [
@@ -83,13 +84,13 @@ def rename_columns(columns):
 class InitialPreprocessor:
     """Preprocesses raw UCLCHEM data into cleaned PyTorch tensors."""
 
-    def __init__(self, cfg: DictConfig) -> None:
+    def __init__(self, cfg: Any) -> None:
         """Initialize the preprocessor."""
         self.cfg = cfg
 
     def load_initial_abundances(self, species: list[str]) -> pd.DataFrame:
         """Loads initial abundances with uninitialized information."""
-        initial_abundances = np.load(self.cfg.initial_abundances)
+        initial_abundances = np.load(self.cfg.dataset.initial_abundances)
         df_init = pd.DataFrame(initial_abundances, columns=species)
         df_init["Radfield"] = 0
         df_init["Time"] = 0
@@ -101,14 +102,14 @@ class InitialPreprocessor:
     def _load_species(self) -> list[str]:
         """Loads the list of chemical species from file."""
         return np.loadtxt(
-            self.cfg.species_file, dtype=str, delimiter=" ", comments=None
+            self.cfg.dataset.species_file, dtype=str, delimiter=" ", comments=None
         ).tolist()
 
     def _load_raw_data(self) -> pd.DataFrame:
         """Loads raw data from HDF5 file."""
-        input_path = Path(self.cfg.raw_path)
+        input_path = Path(self.cfg.dataset.raw_path)
         # Default key to 'data' if not specified, as it was previously in preprocessing.input_key
-        key = getattr(self.cfg, "input_key", "data")
+        key = self.cfg.dataset.input_key
         df = pd.read_hdf(input_path, key=key)
         if isinstance(df, pd.DataFrame):
             return df
@@ -117,10 +118,8 @@ class InitialPreprocessor:
     def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Renames columns and drops unwanted ones."""
         df.columns = rename_columns(df.columns)
-        if self.cfg.columns_to_drop:
-            df = df.drop(columns=self.cfg.columns_to_drop, errors="ignore")
-        if hasattr(self.cfg, "min_radfield"):
-            df["Radfield"] = np.maximum(df["Radfield"], self.cfg.min_radfield)
+        if self.cfg.dataset.columns_to_drop:
+            df = df.drop(columns=self.cfg.dataset.columns_to_drop, errors="ignore")
         return df
 
     def _process_trajectories(
@@ -136,9 +135,9 @@ class InitialPreprocessor:
             df_init["Model"] = tdf.iloc[0]["Model"]
             tdf = pd.concat([df_init, tdf], ignore_index=True)
 
-            physical = tdf[self.cfg.phys].shift(-1)
+            physical = tdf[self.cfg.dataset.phys].shift(-1)
             physical.iloc[-1] = physical.iloc[-2]
-            tdf.loc[:, self.cfg.phys] = physical.values
+            tdf.loc[:, self.cfg.dataset.phys] = physical.values
             output_chunks.append(tdf)
 
         return pd.concat(output_chunks, ignore_index=True)
@@ -147,8 +146,8 @@ class InitialPreprocessor:
         """Clips species abundances to configured range."""
         df = df.sort_values(by=["Model", "Time"]).reset_index(drop=True)
         df[species] = df[species].clip(
-            lower=self.cfg.abundances_clipping.lower,
-            upper=self.cfg.abundances_clipping.upper,
+            lower=self.cfg.dataset.abundances_lower,
+            upper=self.cfg.dataset.abundances_upper,
         )
         return df
 
@@ -157,7 +156,7 @@ class InitialPreprocessor:
         np.random.seed(self.cfg.seed)
         tracers = df["Model"].unique()
         np.random.shuffle(tracers)
-        split_idx = int(len(tracers) * self.cfg.train_split)
+        split_idx = int(len(tracers) * self.cfg.dataset.train_split)
         return tracers[:split_idx], tracers[split_idx:]
 
     def _to_3d_tensor(
@@ -171,7 +170,7 @@ class InitialPreprocessor:
         for tracer in tracers:
             if tracer in grouped.groups:
                 group = grouped.get_group(tracer)
-                data = group[self.cfg.phys + species].values
+                data = group[self.cfg.dataset.phys + species].values
                 tensors.append(data)
 
         return torch.tensor(np.stack(tensors), dtype=torch.float32)
@@ -183,12 +182,8 @@ class InitialPreprocessor:
         val: torch.Tensor,
     ) -> None:
         """Saves processed tensors to .pt files."""
-        train_filename = getattr(
-            self.cfg.output, "train_tensor", "initial_train_preprocessed.pt"
-        )
-        val_filename = getattr(
-            self.cfg.output, "val_tensor", "initial_val_preprocessed.pt"
-        )
+        train_filename = self.cfg.method.train_tensor
+        val_filename = self.cfg.method.val_tensor
 
         output_path_train = output_dir / train_filename
         output_path_val = output_dir / val_filename
@@ -220,8 +215,8 @@ class InitialPreprocessor:
                     multiplier = int(match.group(1)) if match.group(1) else 1
                     stoichiometric_matrix[elem_idx, species_idx] = multiplier
 
-        stoich_filename = getattr(
-            self.cfg.output, "stoichiometric_matrix", "stoichiometric_matrix.pt"
+        stoich_filename = (
+            self.cfg.method.stoichiometric_matrix or "stoichiometric_matrix.pt"
         )
         output_path = output_dir / stoich_filename
         torch.save(torch.from_numpy(stoichiometric_matrix.T), output_path)
@@ -230,7 +225,7 @@ class InitialPreprocessor:
 
     def run(self, output_dir: Path) -> None:
         """Executes the preprocessing pipeline."""
-        print(f"Configuration:\n{OmegaConf.to_yaml(self.cfg)}")
+        print(f"Configuration:\n{config_to_dict(self.cfg)}")
         species = self._load_species()
         df = self._load_raw_data()
 

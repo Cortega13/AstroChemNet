@@ -1,8 +1,11 @@
 """Data loading utilities for training and inference."""
 
+from __future__ import annotations
+
 import torch
-from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset, Sampler
+
+from src.configs import AutoencoderConfig, ComponentConfig, DatasetConfig
 
 
 class ChunkedShuffleSampler(Sampler):
@@ -81,8 +84,8 @@ class AutoregressiveDataset(Dataset):
 
     def __init__(
         self,
-        dataset_cfg: DictConfig,
-        autoencoder_cfg: DictConfig,
+        dataset_cfg: DatasetConfig,
+        autoencoder_cfg: AutoencoderConfig,
         data_3d: torch.Tensor,
         horizon: int,
     ):
@@ -148,7 +151,7 @@ class AutoregressiveDataset(Dataset):
 
 
 def tensor_to_dataloader(
-    model_cfg: DictConfig,
+    model_cfg: ComponentConfig,
     torch_dataset: AutoencoderDataset | AutoregressiveDataset,
     shuffle: bool = True,
 ) -> DataLoader:
@@ -165,7 +168,7 @@ def tensor_to_dataloader(
         torch_dataset,
         batch_size=model_cfg.batch_size,
         pin_memory=True,
-        num_workers=getattr(model_cfg, "num_workers", 10),
+        num_workers=model_cfg.num_workers,
         shuffle=False if sampler else shuffle,
         sampler=sampler,
     )

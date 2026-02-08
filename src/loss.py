@@ -8,13 +8,7 @@ class Loss:
     """Loss functions for training."""
 
     def __init__(self, processing_functions, dataset_cfg, model_cfg=None):
-        """Initialize loss functions with config objects.
-
-        Args:
-            processing_functions: Processing instance for scaling operations
-            dataset_cfg: Dataset configuration (DictConfig or similar)
-            model_cfg: Model/component configuration (DictConfig or similar)
-        """
+        """Initialize loss functions with processing and configuration objects."""
         device = processing_functions.device
         stoichiometric_matrix = np.load(dataset_cfg.stoichiometric_matrix_path)
         self.stoichiometric_matrix = torch.tensor(

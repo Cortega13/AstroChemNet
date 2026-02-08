@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import torch
-from omegaconf import DictConfig
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
@@ -19,10 +19,9 @@ from src.loss import Loss
 from src.trainers.base_trainer import BaseTrainer
 
 
-def _resolve_preprocess_dir(cfg: DictConfig, root: Path) -> Path:
+def _resolve_preprocess_dir(cfg: Any, root: Path) -> Path:
     """Resolve the preprocessing output directory."""
-    preprocessed_dir = cfg.get("paths", {}).get("preprocessed", "outputs/preprocessed")
-    return root / f"{preprocessed_dir}/{cfg.dataset.name}/{cfg.preprocessing.name}"
+    return root / cfg.paths.preprocessed_dir / cfg.dataset.name / cfg.preprocessing.name
 
 
 def _load_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
@@ -33,7 +32,7 @@ def _load_tensors(preprocess_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _build_dataloaders(
-    cfg: DictConfig,
+    cfg: Any,
     training_tensor: torch.Tensor,
     validation_tensor: torch.Tensor,
 ) -> tuple[DataLoader, DataLoader, int]:
@@ -51,7 +50,7 @@ def _build_dataloaders(
     return training_dataloader, validation_dataloader, len(validation_dataset)
 
 
-def _build_model(cfg: DictConfig, device: str) -> Autoencoder:
+def _build_model(cfg: Any, device: str) -> Autoencoder:
     """Build the autoencoder model."""
     return Autoencoder(
         input_dim=cfg.dataset.n_species,
@@ -62,9 +61,7 @@ def _build_model(cfg: DictConfig, device: str) -> Autoencoder:
     ).to(device)
 
 
-def _build_optimizer(
-    cfg: DictConfig, model: Autoencoder, device: str
-) -> optim.Optimizer:
+def _build_optimizer(cfg: Any, model: Autoencoder, device: str) -> optim.Optimizer:
     """Build the optimizer for autoencoder training."""
     return optim.AdamW(
         model.parameters(),
@@ -75,7 +72,7 @@ def _build_optimizer(
     )
 
 
-def _build_scheduler(cfg: DictConfig, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
+def _build_scheduler(cfg: Any, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
     """Build the learning rate scheduler."""
     return ReduceLROnPlateau(
         optimizer,
@@ -85,12 +82,12 @@ def _build_scheduler(cfg: DictConfig, optimizer: optim.Optimizer) -> ReduceLROnP
     )
 
 
-def _build_processing(cfg: DictConfig, device: str) -> Processing:
+def _build_processing(cfg: Any, device: str) -> Processing:
     """Build processing functions for scaling."""
     return Processing(cfg.dataset, device)
 
 
-def _build_loss(processing: Processing, cfg: DictConfig) -> Loss:
+def _build_loss(processing: Processing, cfg: Any) -> Loss:
     """Build the loss function wrapper."""
     return Loss(processing, cfg.dataset, cfg.component)
 
@@ -112,7 +109,7 @@ def _extract_features(batch: object) -> torch.Tensor:
 class AutoencoderTrainer(BaseTrainer):
     """Trains an autoencoder with reconstruction loss."""
 
-    def __init__(self, cfg: DictConfig, root: Path) -> None:
+    def __init__(self, cfg: Any, root: Path) -> None:
         """Initialize AutoencoderTrainer."""
         super().__init__(cfg, root)
         preprocess_dir = _resolve_preprocess_dir(cfg, root)
@@ -123,8 +120,9 @@ class AutoencoderTrainer(BaseTrainer):
             self.validation_dataloader,
             self.num_validation_elements,
         ) = _build_dataloaders(cfg, training_tensor, validation_tensor)
-        self.model = _build_model(cfg, self.device)
-        self.optimizer = _build_optimizer(cfg, self.model, self.device)
+        model = _build_model(cfg, self.device)
+        self.model = model
+        self.optimizer = _build_optimizer(cfg, model, self.device)
         self.scheduler = _build_scheduler(cfg, self.optimizer)
         self.processing = _build_processing(cfg, self.device)
         self.loss_fn = _build_loss(self.processing, cfg)
@@ -143,19 +141,20 @@ class AutoencoderTrainer(BaseTrainer):
         """Compute and save min/max values of encoded latents."""
         min_, max_ = float("inf"), float("-inf")
         if self.model:
+            model = cast(Autoencoder, self.model)
             self.model.eval()
             with torch.no_grad():
                 for batch in self.validation_dataloader:
-                    features = _extract_features(batch).to(
+                    batch_features = _extract_features(batch).to(
                         self.device, non_blocking=True
                     )
-                    encoded = self.model.encode(features).cpu()
+                    encoded = model.encode(batch_features).cpu()
                     min_ = min(min_, encoded.min().item())
                     max_ = max(max_, encoded.max().item())
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
         np.save(self.output_dir / "latents_minmax.npy", minmax_np)
-        if "latents_minmax_path" in self.cfg.component:
+        if self.cfg.component.latents_minmax_path:
             path = Path(self.cfg.component.latents_minmax_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             np.save(path, minmax_np)
@@ -163,21 +162,22 @@ class AutoencoderTrainer(BaseTrainer):
     def train_epoch(self) -> float:
         """Train the autoencoder for one epoch."""
         sampler = self.training_dataloader.sampler
-        if hasattr(sampler, "set_epoch") and callable(getattr(sampler, "set_epoch")):
-            getattr(sampler, "set_epoch")(self.current_epoch)
+        if hasattr(sampler, "set_epoch") and callable(sampler.set_epoch):
+            sampler.set_epoch(self.current_epoch)
         tic = datetime.now()
         if self.model:
             self.model.train()
         loss = torch.tensor(0.0)
+        model = cast(Autoencoder, self.model)
         for batch in self.training_dataloader:
-            features = _extract_features(batch).to(self.device, non_blocking=True)
+            batch_features = _extract_features(batch).to(self.device, non_blocking=True)
             if self.optimizer and self.model:
                 self.optimizer.zero_grad()
-                outputs = self.model(features)
-                loss = self.loss_fn.training(outputs, features)
+                outputs = model(batch_features)
+                loss = self.loss_fn.training(outputs, batch_features)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), self.gradient_clipping
+                    model.parameters(), self.gradient_clipping
                 )
                 self.optimizer.step()
         print(f"Training Time: {datetime.now() - tic}")
@@ -188,13 +188,16 @@ class AutoencoderTrainer(BaseTrainer):
         tic = datetime.now()
         if self.model:
             self.model.eval()
+        model = cast(Autoencoder, self.model)
         with torch.no_grad():
             for batch in self.validation_dataloader:
-                features = _extract_features(batch).to(self.device, non_blocking=True)
+                batch_features = _extract_features(batch).to(
+                    self.device, non_blocking=True
+                )
                 if self.model:
-                    encoded = self.model.encode(features)
-                    outputs = self.model.decode(encoded)
-                    loss = self.loss_fn.validation(outputs, features)
+                    encoded = model.encode(batch_features)
+                    outputs = model.decode(encoded)
+                    loss = self.loss_fn.validation(outputs, batch_features)
                     self.epoch_validation_loss += loss
         print(f"Validation Time: {datetime.now() - tic}")
         val_loss = self.epoch_validation_loss / self.num_validation_elements

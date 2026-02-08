@@ -1,18 +1,30 @@
 """Defines a surrogate combining an autoencoder and emulator."""
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
-from omegaconf import DictConfig
 
 from src.components.autoencoder import Autoencoder
 from src.components.emulator import Emulator
+from src.configs import ComponentConfig, SurrogateConfig
 from src.data_processing import Processing
 
 
 class AutoencoderEmulatorSurrogate:
     """Surrogate model using Autoencoder + Emulator."""
+
+    def __init__(
+        self,
+        cfg: SurrogateConfig,
+        components: dict[str, dict[str, ComponentConfig | Path]],
+        root: Path,
+    ) -> None:
+        """Initializes the surrogate with configuration and component bundles."""
+        self.cfg = cfg
+        self.components = components
+        self.root = root
 
     def benchmark(self) -> dict[str, object]:
         """Benchmark the surrogate model."""
@@ -24,7 +36,7 @@ class Inference:
 
     def __init__(
         self,
-        general_config: DictConfig,
+        general_config: Any,
         processing_functions: Processing,
         autoencoder: Autoencoder | None = None,
         emulator: Emulator | None = None,
@@ -74,6 +86,8 @@ class Inference:
 
     def _decode_flat_latents(self, flat_latents: torch.Tensor) -> torch.Tensor:
         """Decode 2D latents into abundance space."""
+        if self.autoencoder is None:
+            raise ValueError("Autoencoder model not initialized")
         with torch.no_grad():
             latents_t = self.convert_to_tensor(flat_latents)
             scaled = self.autoencoder.decode(latents_t)
