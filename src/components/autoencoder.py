@@ -88,13 +88,12 @@ def load_autoencoder(
         noise=model_config.noise,
         dropout=model_config.dropout,
     ).to(general_config.device)
+
     pretrained_model_path = model_config.pretrained_model_path
     if pretrained_model_path and os.path.exists(pretrained_model_path):
         print("Loading Pretrained Model")
         autoencoder.load_state_dict(
-            torch.load(
-                pretrained_model_path, map_location=torch.device("cpu")
-            )
+            torch.load(pretrained_model_path, map_location=torch.device("cpu"))
         )
 
     if inference:

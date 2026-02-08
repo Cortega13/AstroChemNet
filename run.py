@@ -16,7 +16,7 @@ def _build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("component", nargs="?", default="autoencoder_grav")
 
     prep_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
-    prep_parser.add_argument("source", nargs="?", default="grav")
+    prep_parser.add_argument("source", nargs="?", default="uclchem_grav")
     prep_parser.add_argument("method", nargs="?", default="initial")
 
     bench_parser = subparsers.add_parser("benchmark", help="Run benchmarking")

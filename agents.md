@@ -9,7 +9,7 @@ before and after your code.
 
 - Every class and function MUST have a one-line docstring.
 - Every script must have a 1 liner at the top describing the purpose.
-
+- Backwards compatability does not matter at this moment because we are in development stage.
 
 # Coding Standards
 

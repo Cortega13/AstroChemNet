@@ -1,6 +1,6 @@
 """Summarize final-time abundance Δlog10 = log10(large) - log10(small) across all tracers.
 
-Example usage: python scripts/carbox/final_abundance_diffs.py --h5-path data/carbox_gravitational_collapse.h5 --top-k 50
+Example usage: python scripts/carbox/final_abundance_diffs.py --h5-path data/carbox_grav.h5 --top-k 50
 """
 
 from __future__ import annotations
@@ -326,7 +326,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--h5-path",
         type=Path,
-        default=Path("data/carbox_gravitational_collapse.h5"),
+        default=Path("data/carbox_grav.h5"),
         help="Compressed HDF5 file produced by compress_tracer_outputs_to_h5.py",
     )
     parser.add_argument(

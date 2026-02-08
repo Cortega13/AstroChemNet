@@ -7,7 +7,7 @@ This package contains training/testing procedures for deep neural surrogate mode
 
 ```sh
 # 1) Preprocess grav data
-python run.py preprocess grav initial
+python run.py preprocess uclchem_grav initial
 python run.py preprocess initial autoencoder
 python run.py preprocess initial autoregressive
 

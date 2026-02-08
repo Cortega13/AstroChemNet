@@ -72,9 +72,9 @@ class DatasetSummary:
 def _parse_args() -> argparse.Namespace:
     """Parse CLI arguments for analysis and preprocessing."""
     parser = argparse.ArgumentParser(
-        description="Analyze data/carbox_gravitational_collapse.h5 and build train/val tensors"
+        description="Analyze data/carbox_grav.h5 and build train/val tensors"
     )
-    parser.add_argument("--h5-path", default="data/carbox_gravitational_collapse.h5")
+    parser.add_argument("--h5-path", default="data/carbox_grav.h5")
     parser.add_argument("--key", default="large")
     parser.add_argument("--dataset-name", default="carbox_grav")
     parser.add_argument("--output-root", default="outputs")
@@ -111,7 +111,7 @@ def _build_paths(args: argparse.Namespace) -> CarboxPaths:
         output_root=output_root,
         analysis_dir=analysis_dir,
         preprocessed_dir=preprocessed_dir,
-        species_master_path=Path("data/species.txt"),
+        species_master_path=Path("data/uclchem_species.txt"),
         initial_abundances_path=Path("data/initial_abundances.npy"),
     )
 
@@ -808,7 +808,7 @@ def _write_dataset_config(
         dataset_name=paths.dataset_name,
         raw_path=str(paths.h5_path),
         input_key=paths.key,
-        species_file=f"data/{paths.dataset_name}_species.txt",
+        species_file="data/carbox_species.txt",
         n_species=n_species,
         phys_ranges=phys_ranges,
     )
@@ -959,7 +959,7 @@ def _main() -> None:
     print(_render_summary_text(summary))
 
     if not bool(args.skip_species_file):
-        species_path = Path("data") / f"{paths.dataset_name}_species.txt"
+        species_path = Path("data/carbox_species.txt")
         _write_text_lines(species_path, present_species)
 
     if not bool(args.skip_config):

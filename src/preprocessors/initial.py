@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import re
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
 import pandas as pd
 import torch
-
-from src.configs import config_to_dict
 
 # Chemical elements tracked for stoichiometric matrix
 CHEMICAL_ELEMENTS: Final[list[str]] = [
@@ -225,7 +224,7 @@ class InitialPreprocessor:
 
     def run(self, output_dir: Path) -> None:
         """Executes the preprocessing pipeline."""
-        print(f"Configuration:\n{config_to_dict(self.cfg)}")
+        print(f"Configuration:\n{asdict(self.cfg)}")
         species = self._load_species()
         df = self._load_raw_data()
 

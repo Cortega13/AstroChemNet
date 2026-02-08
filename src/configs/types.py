@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass(slots=True)
@@ -12,22 +13,18 @@ class DatasetConfig:
     name: str
     raw_path: str
     input_key: str
-    n_species: int
     species_file: str
     initial_abundances: str
-    phys: list[str]
-    physical_ranges: dict[str, tuple[float, float]]
-    n_params: int
+    phys_ranges: dict[str, tuple[float, float]]
     metadata_columns: list[str]
     columns_to_drop: list[str]
     num_metadata: int
     num_phys: int
+    num_species: int
     abundances_lower: float
     abundances_upper: float
     stoichiometric_matrix_path: str
     train_split: float
-    seed: int
-    num_species: int
     species: list[str] = field(default_factory=list)
 
 
@@ -36,7 +33,6 @@ class AutoencoderConfig:
     """Defines autoencoder component configuration values."""
 
     name: str
-    type: str
     dataset: str
     preprocessing_method: str
     hidden_dims: tuple[int, int]
@@ -68,7 +64,6 @@ class EmulatorConfig:
     """Defines emulator component configuration values."""
 
     name: str
-    type: str
     dataset: str
     preprocessing_method: str
     autoencoder_component: str
@@ -102,3 +97,59 @@ class SurrogateConfig:
     components: dict[str, str]
     rollout_steps: int
     device: str
+
+
+@dataclass(slots=True)
+class RuntimePathsConfig:
+    """Defines runtime path settings."""
+
+    weights_dir: str
+    preprocessed_dir: str
+
+
+@dataclass(slots=True)
+class RuntimeConfig:
+    """Defines runtime execution settings."""
+
+    device: str
+    seed: int
+    paths: RuntimePathsConfig
+
+
+@dataclass(slots=True)
+class PreprocessingConfig:
+    """Defines preprocessing stage settings."""
+
+    name: str
+    input_source: str
+    train_tensor: str
+    val_tensor: str
+    stoichiometric_matrix: str | None
+    autoencoder_component: str | None = None
+
+
+@dataclass(slots=True)
+class TrainingRunConfig:
+    """Defines assembled training runtime configuration."""
+
+    device: str
+    seed: int
+    root: Path
+    paths: RuntimePathsConfig
+    dataset: DatasetConfig
+    preprocessing: PreprocessingConfig
+    component: ComponentConfig
+
+
+@dataclass(slots=True)
+class PreprocessRunConfig:
+    """Defines assembled preprocessing runtime configuration."""
+
+    device: str
+    seed: int
+    root: Path
+    paths: RuntimePathsConfig
+    dataset: DatasetConfig
+    method: PreprocessingConfig
+    input_dir: str | None
+    autoencoder: AutoencoderConfig | None

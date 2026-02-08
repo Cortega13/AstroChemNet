@@ -25,7 +25,8 @@ def load_3d_tensors(cfg: Any) -> tuple[torch.Tensor, torch.Tensor]:
             f"Preprocessed data not found. Expected files:\n"
             f"  - {train_path}\n"
             f"  - {val_path}\n"
-            f"Run initial preprocessing first: python run.py preprocess grav initial"
+            "Run initial preprocessing first: "
+            "python run.py preprocess uclchem_grav initial"
         )
 
     training = torch.load(train_path)

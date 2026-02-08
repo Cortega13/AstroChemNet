@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any
 
 import torch
 from torch import optim
@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from src.components.autoencoder import Autoencoder
 from src.components.emulator import Emulator
-from src.configs import AutoencoderConfig, load_component_config
+from src.configs import AutoencoderConfig, ComponentName
 from src.data_loading import AutoregressiveDataset, tensor_to_dataloader
 from src.data_processing import Processing
 from src.loss import Loss
@@ -32,7 +32,7 @@ def _resolve_ae_paths(cfg: Any, root: Path) -> tuple[str, Path, Path]:
 
 def _load_ae_cfg(root: Path, component_name: str) -> AutoencoderConfig:
     """Load autoencoder component configuration."""
-    ae_cfg = load_component_config(root, component_name)
+    ae_cfg = ComponentName(component_name).config()
     if not isinstance(ae_cfg, AutoencoderConfig):
         raise TypeError(f"Expected autoencoder component, got {ae_cfg.type}")
     return ae_cfg

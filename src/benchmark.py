@@ -3,11 +3,15 @@
 from pathlib import Path
 
 from src.configs import (
+    RUNTIME,
     ComponentConfig,
     SurrogateConfig,
-    load_component_config,
-    load_runtime,
-    load_surrogate_config,
+)
+from src.configs import (
+    ComponentName as ComponentConfigName,
+)
+from src.configs import (
+    SurrogateName as SurrogateConfigName,
 )
 from src.surrogates import SurrogateName
 
@@ -16,8 +20,8 @@ ROOT = Path(__file__).parent.parent.resolve()
 
 def load_component_bundle(component_name: str, root: Path) -> tuple[ComponentConfig, Path]:
     """Loads component config and validates the weights file path."""
-    cfg = load_component_config(root, component_name)
-    runtime = load_runtime(root)
+    cfg = ComponentConfigName(component_name).config()
+    runtime = RUNTIME
     weights_path = root / runtime.paths.weights_dir / component_name / "weights.pth"
     if not weights_path.exists():
         raise ValueError(f"Weights not found: {weights_path}")
@@ -28,7 +32,7 @@ def _load_components(
     surrogate_name: str,
 ) -> tuple[SurrogateConfig, dict[str, dict[str, ComponentConfig | Path]]]:
     """Loads surrogate config and all referenced components."""
-    surrogate_cfg = load_surrogate_config(ROOT, surrogate_name)
+    surrogate_cfg = SurrogateConfigName(surrogate_name).config()
     components: dict[str, dict[str, ComponentConfig | Path]] = {}
     for role, component_name in surrogate_cfg.components.items():
         cfg, weights = load_component_bundle(component_name, ROOT)

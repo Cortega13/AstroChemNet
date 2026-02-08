@@ -306,7 +306,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--h5-path",
         type=Path,
-        default=Path("data/carbox_gravitational_collapse.h5"),
+        default=Path("data/carbox_grav.h5"),
         help="Compressed HDF5 file to read",
     )
     parser.add_argument(
