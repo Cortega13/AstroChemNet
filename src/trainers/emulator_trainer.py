@@ -145,19 +145,6 @@ def _extract_batch(batch: object) -> tuple[torch.Tensor, torch.Tensor, torch.Ten
     return phys, features, targets
 
 
-class _HasSetEpoch(Protocol):
-    """Defines sampler interface for distributed-style epoch seeding."""
-
-    def set_epoch(self, epoch: int) -> None:
-        """Sets the current epoch for deterministic reshuffling."""
-
-
-def _maybe_set_epoch(sampler: object, epoch: int) -> None:
-    """Calls `set_epoch` on samplers that support it."""
-    if hasattr(sampler, "set_epoch"):
-        cast(_HasSetEpoch, sampler).set_epoch(epoch)
-
-
 class EmulatorTrainer(BaseTrainer):
     """Trains a latent-space autoregressive emulator."""
 
@@ -209,7 +196,7 @@ class EmulatorTrainer(BaseTrainer):
 
     def train_epoch(self) -> float:
         """Train the emulator for one epoch."""
-        _maybe_set_epoch(self.training_dataloader.sampler, self.current_epoch)
+        self.training_dataloader.sampler.set_epoch(self.current_epoch)  # type:ignore
         tic = datetime.now()
         if self.model:
             self.model.train()

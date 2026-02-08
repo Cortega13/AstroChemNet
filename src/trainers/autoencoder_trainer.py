@@ -161,9 +161,7 @@ class AutoencoderTrainer(BaseTrainer):
 
     def train_epoch(self) -> float:
         """Train the autoencoder for one epoch."""
-        sampler = self.training_dataloader.sampler
-        if hasattr(sampler, "set_epoch") and callable(sampler.set_epoch):
-            sampler.set_epoch(self.current_epoch)
+        self.training_dataloader.sampler.set_epoch(self.current_epoch)  # type:ignore
         tic = datetime.now()
         if self.model:
             self.model.train()
