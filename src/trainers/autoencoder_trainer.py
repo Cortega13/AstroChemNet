@@ -75,9 +75,7 @@ def _build_optimizer(
     )
 
 
-def _build_scheduler(
-    cfg: DictConfig, optimizer: optim.Optimizer
-) -> ReduceLROnPlateau:
+def _build_scheduler(cfg: DictConfig, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
     """Build the learning rate scheduler."""
     return ReduceLROnPlateau(
         optimizer,

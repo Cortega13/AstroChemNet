@@ -94,9 +94,7 @@ class Processing:
 
     def latents_scaling(self, latents: torch.Tensor) -> torch.Tensor:
         """Scale latents into [0, 1]."""
-        return (latents - self.latents_min) / (
-            self.latents_max - self.latents_min
-        )
+        return (latents - self.latents_min) / (self.latents_max - self.latents_min)
 
     def inverse_physical_parameter_scaling(
         self, physical_parameters: np.ndarray

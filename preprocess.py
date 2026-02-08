@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 import numpy as np
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from src.preprocessors import PREPROCESSOR_REGISTRY
 
@@ -24,17 +24,17 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_base_cfg() -> OmegaConf:
+def _load_base_cfg() -> DictConfig | ListConfig:
     """Load the base Hydra configuration."""
     return OmegaConf.load(ROOT / "configs/config.yaml")
 
 
-def _load_method_cfg(method: str) -> OmegaConf:
+def _load_method_cfg(method: str) -> DictConfig | ListConfig:
     """Load the preprocessing method configuration."""
     return OmegaConf.load(ROOT / f"configs/preprocessing/{method}.yaml")
 
 
-def _maybe_load_species(cfg: OmegaConf) -> None:
+def _maybe_load_species(cfg: DictConfig | ListConfig) -> None:
     """Load species list from file if configured."""
     if hasattr(cfg, "species_file") and cfg.species_file:
         species = np.loadtxt(
@@ -44,8 +44,8 @@ def _maybe_load_species(cfg: OmegaConf) -> None:
 
 
 def _build_dataset_input_cfg(
-    base_cfg: OmegaConf, source: str, method_cfg: OmegaConf
-) -> OmegaConf:
+    base_cfg: DictConfig | ListConfig, source: str, method_cfg: DictConfig | ListConfig
+) -> DictConfig | ListConfig:
     """Build a merged config for dataset inputs."""
     dataset_cfg = OmegaConf.load(ROOT / f"configs/data/{source}.yaml")
     cfg = OmegaConf.merge(base_cfg, dataset_cfg, method_cfg)
@@ -54,8 +54,8 @@ def _build_dataset_input_cfg(
 
 
 def _build_preprocessed_input_cfg(
-    base_cfg: OmegaConf, source: str, method_cfg: OmegaConf
-) -> tuple[OmegaConf, str]:
+    base_cfg: DictConfig | ListConfig, source: str, method_cfg: DictConfig | ListConfig
+) -> tuple[DictConfig | ListConfig, str]:
     """Build a merged config for preprocessed inputs."""
     source_cfg = OmegaConf.load(ROOT / f"configs/preprocessing/{source}.yaml")
     dataset_name = OmegaConf.select(source_cfg, "input.source", default="grav")
@@ -91,9 +91,7 @@ def main() -> None:
         cfg, dataset_name = _build_preprocessed_input_cfg(
             base_cfg, args.source, method_cfg
         )
-    output_dir = _resolve_output_dir(
-        input_type, args.source, args.method, dataset_name
-    )
+    output_dir = _resolve_output_dir(input_type, args.source, args.method, dataset_name)
     output_dir.mkdir(parents=True, exist_ok=True)
     preprocessor = PREPROCESSOR_REGISTRY[args.method](cfg)
     preprocessor.run(output_dir)

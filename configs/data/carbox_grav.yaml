@@ -1,0 +1,33 @@
+name: carbox_grav
+raw_path: data/carbox_gravitational_collapse.h5
+input_key: large
+
+n_species: 163
+species_file: data/carbox_grav_species.txt
+initial_abundances: data/initial_abundances.npy
+
+phys: [Density, Radfield, Av, gasTemp]
+
+physical_parameters:
+  n_params: 4
+  ranges:
+    Density: [0.5715546011924744, 195699.671875]
+    Radfield: [3.8874722463333455e-07, 3.748945713043213]
+    Av: [0.0075920443050563335, 18.559925079345703]
+    gasTemp: [2.591064214706421, 7209.87451171875]
+
+metadata_columns: [Index, Model, Time]
+columns_to_drop: []
+num_metadata: 3
+num_phys: 4
+
+abundances_clipping:
+  lower: 1.0e-20
+  upper: 1.0
+
+stoichiometric_matrix_path: outputs/preprocessed/carbox_grav/initial/stoichiometric_matrix.pt
+
+train_split: 0.75
+seed: 42
+
+num_species: 163

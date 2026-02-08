@@ -3,14 +3,16 @@
 import argparse
 from pathlib import Path
 
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from src.surrogates import SURROGATE_REGISTRY
 
 ROOT = Path(__file__).parent.resolve()
 
 
-def load_component_config(component_name: str, root: Path) -> tuple[OmegaConf, Path]:
+def load_component_config(
+    component_name: str, root: Path
+) -> tuple[DictConfig | ListConfig, Path]:
     """Load a component config and weights path."""
     config_path = root / f"configs/components/{component_name}.yaml"
     weights_path = root / f"outputs/weights/{component_name}/weights.pth"
@@ -28,12 +30,14 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_surrogate_cfg(name: str) -> OmegaConf:
+def _load_surrogate_cfg(name: str) -> DictConfig | ListConfig:
     """Load a surrogate configuration by name."""
     return OmegaConf.load(ROOT / f"configs/surrogates/{name}.yaml")
 
 
-def _load_components(surrogate_cfg: OmegaConf) -> dict[str, dict[str, object]]:
+def _load_components(
+    surrogate_cfg: DictConfig | ListConfig,
+) -> dict[str, dict[str, object]]:
     """Load component configs and weight paths for a surrogate."""
     components: dict[str, dict[str, object]] = {}
     for role, component_name in surrogate_cfg.components.items():

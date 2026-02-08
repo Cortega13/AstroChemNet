@@ -102,9 +102,7 @@ def _load_frozen_autoencoder(
     return autoencoder
 
 
-def _build_emulator_model(
-    cfg: DictConfig, ae_cfg: DictConfig, device: str
-) -> Emulator:
+def _build_emulator_model(cfg: DictConfig, ae_cfg: DictConfig, device: str) -> Emulator:
     """Build the emulator model."""
     emulator_input_dim = cfg.dataset.physical_parameters.n_params + ae_cfg.latent_dim
     emulator_output_dim = ae_cfg.latent_dim
@@ -116,9 +114,7 @@ def _build_emulator_model(
     ).to(device)
 
 
-def _build_optimizer(
-    cfg: DictConfig, model: Emulator, device: str
-) -> optim.Optimizer:
+def _build_optimizer(cfg: DictConfig, model: Emulator, device: str) -> optim.Optimizer:
     """Build the optimizer for emulator training."""
     return optim.AdamW(
         model.parameters(),
@@ -129,9 +125,7 @@ def _build_optimizer(
     )
 
 
-def _build_scheduler(
-    cfg: DictConfig, optimizer: optim.Optimizer
-) -> ReduceLROnPlateau:
+def _build_scheduler(cfg: DictConfig, optimizer: optim.Optimizer) -> ReduceLROnPlateau:
     """Build the learning rate scheduler."""
     return ReduceLROnPlateau(
         optimizer,
@@ -259,4 +253,3 @@ class EmulatorTrainer(BaseTrainer):
         )
         self.epoch_validation_loss.zero_()
         return {"val_loss": metric, "mean": mean_loss, "std": std_loss, "max": max_loss}
-

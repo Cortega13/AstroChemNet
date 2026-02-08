@@ -33,3 +33,5 @@ outputs/*
 .kilocode/
 .vscode/
 .devcontainer/
+
+*.png
