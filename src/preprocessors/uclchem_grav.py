@@ -5,11 +5,13 @@ from __future__ import annotations
 import re
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 import numpy as np
 import pandas as pd
 import torch
+
+from src.configs import PreprocessRunConfig
 
 # Chemical elements tracked for stoichiometric matrix
 CHEMICAL_ELEMENTS: Final[list[str]] = [
@@ -83,7 +85,7 @@ def rename_columns(columns):
 class UclchemGravPreprocessor:
     """Preprocesses raw UCLCHEM grav data into cleaned PyTorch tensors."""
 
-    def __init__(self, cfg: Any) -> None:
+    def __init__(self, cfg: PreprocessRunConfig) -> None:
         """Initialize the preprocessor."""
         self.cfg = cfg
 
@@ -121,11 +123,16 @@ class UclchemGravPreprocessor:
             df = df.drop(columns=self.cfg.dataset.columns_to_drop, errors="ignore")
         return df
 
+    def _physical_columns(self) -> list[str]:
+        """Returns physical feature column names in configured order."""
+        return list(self.cfg.dataset.phys_ranges.keys())
+
     def _process_trajectories(
         self, df: pd.DataFrame, species: list[str]
     ) -> pd.DataFrame:
         """Adds initial conditions and shifts physical parameters for each trajectory."""
         df_init = self.load_initial_abundances(species)
+        physical_columns = self._physical_columns()
         output_chunks = []
         df.sort_values(by=["Model", "Time"], inplace=True)
 
@@ -134,9 +141,9 @@ class UclchemGravPreprocessor:
             df_init["Model"] = tdf.iloc[0]["Model"]
             tdf = pd.concat([df_init, tdf], ignore_index=True)
 
-            physical = tdf[self.cfg.dataset.phys].shift(-1)
+            physical = tdf[physical_columns].shift(-1)
             physical.iloc[-1] = physical.iloc[-2]
-            tdf.loc[:, self.cfg.dataset.phys] = physical.values
+            tdf.loc[:, physical_columns] = physical.values
             output_chunks.append(tdf)
 
         return pd.concat(output_chunks, ignore_index=True)
@@ -163,16 +170,76 @@ class UclchemGravPreprocessor:
     ) -> torch.Tensor:
         """Converts dataframe to 3D tensor (Tracer, Time, Features)."""
         df = df.sort_values(by=["Model", "Time"])
+        physical_columns = self._physical_columns()
         grouped = df.groupby("Model")
         tensors = []
 
         for tracer in tracers:
             if tracer in grouped.groups:
                 group = grouped.get_group(tracer)
-                data = group[self.cfg.dataset.phys + species].values
+                data = group[physical_columns + species].values
                 tensors.append(data)
 
         return torch.tensor(np.stack(tensors), dtype=torch.float32)
+
+    def _build_sequence(
+        self,
+        group: pd.DataFrame,
+        species: list[str],
+        physical_columns: list[str],
+        initial_species: np.ndarray,
+    ) -> np.ndarray:
+        """Builds one shifted trajectory sequence array for a model group."""
+        phys = group[physical_columns].to_numpy(dtype=np.float32, copy=True)
+        abundances = group[species].to_numpy(dtype=np.float32, copy=True)
+        np.clip(
+            abundances,
+            self.cfg.dataset.abundances_lower,
+            self.cfg.dataset.abundances_upper,
+            out=abundances,
+        )
+        shifted_phys = np.concatenate([phys, phys[-1:]], axis=0)
+        species_with_init = np.concatenate(
+            [initial_species[None, :], abundances], axis=0
+        )
+        return np.concatenate([shifted_phys, species_with_init], axis=1)
+
+    def _build_split_tensors(
+        self,
+        df: pd.DataFrame,
+        species: list[str],
+        train_tracers: np.ndarray,
+        val_tracers: np.ndarray,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Builds train and validation tensors without materializing split dataframes."""
+        physical_columns = self._physical_columns()
+        initial_species = (
+            self.load_initial_abundances(species)[species]
+            .iloc[0]
+            .to_numpy(dtype=np.float32)
+        )
+        feature_count = len(physical_columns) + len(species)
+        sample_tracer = train_tracers[0] if len(train_tracers) else val_tracers[0]
+        sample_rows = int((df["Model"] == sample_tracer).sum()) + 1
+        train_array = np.empty(
+            (len(train_tracers), sample_rows, feature_count), dtype=np.float32
+        )
+        val_array = np.empty(
+            (len(val_tracers), sample_rows, feature_count), dtype=np.float32
+        )
+        train_index = {tracer: idx for idx, tracer in enumerate(train_tracers.tolist())}
+        val_index = {tracer: idx for idx, tracer in enumerate(val_tracers.tolist())}
+
+        df.sort_values(by=["Model", "Time"], inplace=True)
+        for tracer, group in df.groupby("Model", sort=False):
+            sequence = self._build_sequence(
+                group, species, physical_columns, initial_species
+            )
+            if tracer in train_index:
+                train_array[train_index[tracer]] = sequence
+            elif tracer in val_index:
+                val_array[val_index[tracer]] = sequence
+        return torch.from_numpy(train_array), torch.from_numpy(val_array)
 
     def _save_data(
         self,
@@ -218,6 +285,7 @@ class UclchemGravPreprocessor:
             self.cfg.method.stoichiometric_matrix or "stoichiometric_matrix.pt"
         )
         output_path = output_dir / stoich_filename
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(torch.from_numpy(stoichiometric_matrix.T), output_path)
         print(f"Saved stoichiometric matrix to: {output_path}")
         return stoichiometric_matrix.T
@@ -231,18 +299,14 @@ class UclchemGravPreprocessor:
         # rename columns and set radfield minimum
         df = self._clean_dataframe(df)
 
-        # gotta add the initial abundances to each tracer. (forgot to do this during data generation)
-        df = self._process_trajectories(df, species)
-
-        # clip abundances to min of 1e-20 bc anything less than that is ODE solver tolerance.
-        df = self._clip_abundances(df, species)
-
+        # initial-condition row, shifted physical columns, and clipping are handled per group while building tensors.
         train_tracers, val_tracers = self._get_split_tracers(df)
-        train_df = df[df["Model"].isin(train_tracers)]
-        val_df = df[df["Model"].isin(val_tracers)]
-
-        train_tensor = self._to_3d_tensor(train_df, train_tracers, species)
-        val_tensor = self._to_3d_tensor(val_df, val_tracers, species)
+        train_tensor, val_tensor = self._build_split_tensors(
+            df,
+            species,
+            train_tracers,
+            val_tracers,
+        )
 
         self._save_data(output_dir, train_tensor, val_tensor)
         self._build_stoichiometric_matrix(species, output_dir)

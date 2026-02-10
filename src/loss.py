@@ -10,9 +10,13 @@ class Loss:
     def __init__(self, processing_functions, dataset_cfg, model_cfg=None):
         """Initialize loss functions with processing and configuration objects."""
         device = processing_functions.device
-        stoichiometric_matrix = np.load(dataset_cfg.stoichiometric_matrix_path)
-        self.stoichiometric_matrix = torch.tensor(
-            stoichiometric_matrix, dtype=torch.float32, device=device
+        stoichiometric_matrix = torch.load(
+            dataset_cfg.stoichiometric_matrix_path, map_location="cpu"
+        )
+        if isinstance(stoichiometric_matrix, np.ndarray):
+            stoichiometric_matrix = torch.from_numpy(stoichiometric_matrix)
+        self.stoichiometric_matrix = stoichiometric_matrix.to(
+            dtype=torch.float32, device=device
         )
         self.exponential = torch.log(torch.tensor(10, device=device).float())
 
@@ -37,7 +41,6 @@ class Loss:
     ):
         """Calculate elementwise loss."""
         elementwise_loss = torch.abs(outputs - targets)
-        elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
 
         mean_loss = torch.sum(elementwise_loss) / targets.size(0)
 

@@ -51,7 +51,7 @@ class BaseTrainer:
 
         # Save config snapshot
         with open(self.output_dir / "config.json", "w", encoding="utf-8") as handle:
-            json.dump(asdict(self.cfg), handle, indent=2)
+            json.dump(asdict(self.cfg), handle, indent=2, default=str)
 
         # Training loop
         for epoch in range(self.cfg.component.epochs):

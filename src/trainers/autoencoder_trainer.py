@@ -41,17 +41,16 @@ def _build_dataloaders(
     component_config: AutoencoderConfig,
     training_tensor: torch.Tensor,
     validation_tensor: torch.Tensor,
+    device: str,
 ) -> tuple[DataLoader, DataLoader, int]:
     """Create training and validation dataloaders."""
     training_dataset = AutoencoderDataset(training_tensor)
     validation_dataset = AutoencoderDataset(validation_tensor)
-    training_dataloader = tensor_to_dataloader(component_config, training_dataset)
-    validation_dataloader = DataLoader(
-        validation_dataset,
-        batch_size=component_config.batch_size,
-        pin_memory=True,
-        num_workers=10,
-        shuffle=False,
+    training_dataloader = tensor_to_dataloader(
+        component_config, training_dataset, device
+    )
+    validation_dataloader = tensor_to_dataloader(
+        component_config, validation_dataset, device, shuffle=False
     )
     return training_dataloader, validation_dataloader, len(validation_dataset)
 
@@ -125,6 +124,7 @@ class AutoencoderTrainer(BaseTrainer):
             self.component_config,
             training_tensor,
             validation_tensor,
+            self.device,
         )
         model = _build_model(run_config, self.component_config, self.device)
         self.model = model

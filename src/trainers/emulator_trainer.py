@@ -76,9 +76,11 @@ def _build_dataloaders(
     validation_dataset = AutoregressiveDataset(
         cfg.dataset, ae_cfg, validation_3d, cfg.component.horizon
     )
-    training_dataloader = tensor_to_dataloader(cfg.component, training_dataset)
+    training_dataloader = tensor_to_dataloader(
+        cfg.component, training_dataset, cfg.device
+    )
     validation_dataloader = tensor_to_dataloader(
-        cfg.component, validation_dataset, shuffle=False
+        cfg.component, validation_dataset, cfg.device, shuffle=False
     )
     return training_dataloader, validation_dataloader, len(validation_dataset)
 

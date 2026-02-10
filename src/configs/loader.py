@@ -5,6 +5,8 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 
+import torch
+
 from src.configs.types import (
     AutoencoderConfig,
     ComponentConfig,
@@ -19,7 +21,7 @@ from src.configs.types import (
 )
 
 RUNTIME = RuntimeConfig(
-    device="cuda",
+    device="cuda" if torch.cuda.is_available() else "cpu",
     seed=13,
     paths=RuntimePathsConfig(
         weights_dir="outputs/weights",
@@ -46,9 +48,7 @@ uclchem_grav = DatasetConfig(
     num_species=333,
     abundances_lower=1.0e-20,
     abundances_upper=1.0,
-    stoichiometric_matrix_path=(
-        "outputs/preprocessed/uclchem_grav/uclchem_grav/stoichiometric_matrix.pt"
-    ),
+    stoichiometric_matrix_path="outputs/preprocessed/uclchem_grav/stoichiometric_matrix.pt",
     train_split=0.75,
 )
 
@@ -286,6 +286,8 @@ def _resolve_input_dir(
     """Resolves the input directory path for chained preprocessing."""
     if method.name == "uclchem_grav":
         return None
+    if method.input_source == dataset_name:
+        return str(root / RUNTIME.paths.preprocessed_dir / dataset_name)
     return str(
         root / RUNTIME.paths.preprocessed_dir / dataset_name / method.input_source
     )

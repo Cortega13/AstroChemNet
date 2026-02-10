@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import torch
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import DataLoader, Dataset, Sampler, default_collate
 
 from src.configs import AutoencoderConfig, ComponentConfig, DatasetConfig
 
@@ -150,12 +150,22 @@ class AutoregressiveDataset(Dataset):
         return batch_phys, batch_initial_latents, batch_target_latents
 
 
+def _collate_prebatched(batch: object) -> object:
+    """Collate dataset output while supporting __getitems__ pre-batched returns."""
+    if not isinstance(batch, list):
+        return batch
+    return default_collate(batch)
+
+
 def tensor_to_dataloader(
     model_cfg: ComponentConfig,
     torch_dataset: AutoencoderDataset | AutoregressiveDataset,
+    device: str,
     shuffle: bool = True,
 ) -> DataLoader:
     """Create a DataLoader with chunked shuffling for memory efficiency."""
+    use_cuda = device == "cuda"
+    workers = model_cfg.num_workers if use_cuda else 0
     sampler = None
     if shuffle:
         data_size = len(torch_dataset)
@@ -167,8 +177,9 @@ def tensor_to_dataloader(
     return DataLoader(
         torch_dataset,
         batch_size=model_cfg.batch_size,
-        pin_memory=True,
-        num_workers=model_cfg.num_workers,
+        pin_memory=use_cuda,
+        num_workers=workers,
         shuffle=False if sampler else shuffle,
         sampler=sampler,
+        collate_fn=_collate_prebatched,
     )

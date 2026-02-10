@@ -34,6 +34,8 @@ def _resolve_output_dir(
     root: Path, preprocessed_dir: str, dataset_name: str, method: str
 ) -> Path:
     """Resolves the preprocessing output directory."""
+    if method == dataset_name:
+        return root / preprocessed_dir / dataset_name
     return root / preprocessed_dir / dataset_name / method
 
 
