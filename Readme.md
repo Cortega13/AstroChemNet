@@ -16,12 +16,6 @@ Enter the project directory.
 cd AstroChemNet
 ```
 
-Install the package using pip. Note: No necessary package dependencies are defined yet, so you must download them separately.
-
-```sh
-pip install -e .
-```
-
 ## Gravitational Collapse Benchmark
 
 ## Turbulent Gas Benchmark
