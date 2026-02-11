@@ -48,7 +48,6 @@
   // ✅ Enable the overview ruler & minimap markers
   "editor.minimap.enabled": true,
   "editor.overviewRulerBorder": true,
-  "editor.overviewRulerLanes": 3,
   "problems.decorations.enabled": true,
   "problems.autoReveal": true,
 
@@ -65,7 +64,6 @@
 
   // --- IntelliSense speed ---
   "python.analysis.completeFunctionParens": true,
-  "python.analysis.memory.keepLibraryAst": false,
 
   // --- Auto-import and fixes ---
   "editor.codeActionsOnSave": {
@@ -81,5 +79,17 @@
   "autoDocstring.generateDocstringOnEnter": true,
   "autoDocstring.startOnNewLine": true,
   "autoDocstring.includeName": true,
-  "autoDocstring.includeExtendedSummary": false
+  "autoDocstring.includeExtendedSummary": false,
+
+  "notebook.formatOnSave.enabled": true,
+  "notebook.codeActionsOnSave": {
+    "notebook.source.fixAll": "explicit",
+    "notebook.source.organizeImports": "explicit"
+  },
+
+  // --- Hide ruff cache folder ---
+  "files.exclude": {
+    ".ruff_cache": true,
+    ".pytest_cache": true
+  }
 }

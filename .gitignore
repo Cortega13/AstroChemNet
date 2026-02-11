@@ -12,3 +12,8 @@ __pycache__/
 *.h5
 *.npy
 *.csv
+
+.vscode/
+.devcontainer/
+.pytest_cache/
+.venv/
