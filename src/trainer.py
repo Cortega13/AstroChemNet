@@ -12,14 +12,15 @@ from torch.backends import cudnn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
-import src.AstroChemNet.data_processing as dp
 from configs.autoencoder import AEConfig
 from configs.emulator import EMConfig
 from configs.general import GeneralConfig
-from nn_architectures.autoencoder import Autoencoder
-from nn_architectures.emulator import Emulator
-from src.AstroChemNet.inference import Inference
-from src.AstroChemNet.loss import Loss
+from models.autoencoder import Autoencoder
+from models.emulator import Emulator
+
+from . import data_processing as dp
+from .inference import Inference
+from .loss import Loss
 
 cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True

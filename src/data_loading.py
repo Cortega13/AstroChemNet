@@ -67,8 +67,8 @@ def load_tensors_from_hdf5(GeneralConfig, category: str):
     """Load saved tensors to quickly run an emulator training session."""
     dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
-        dataset = f["dataset"][:]
-        indices = f["indices"][:]
+        dataset = f["dataset"][:]  # type:ignore
+        indices = f["indices"][:]  # type:ignore
     dataset = torch.from_numpy(dataset).float()
     indices = torch.from_numpy(indices).int()
     return dataset, indices
@@ -134,7 +134,7 @@ class AutoencoderDataset(Dataset):
     def __len__(self):
         return len(self.data_matrix)
 
-    def __getitems__(self, indices: list):
+    def __getitems__(self, indices: list[int]):
         indices = torch.tensor(indices, dtype=torch.long)
         features = self.data_matrix[indices]
         return features, 1

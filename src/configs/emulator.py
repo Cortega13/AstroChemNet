@@ -1,10 +1,16 @@
+"""Configuration dataclasses for emulator."""
+
 import os
+from dataclasses import dataclass
 
 from configs.autoencoder import AEConfig
 from configs.general import GeneralConfig
 
 
+@dataclass
 class EMConfig:
+    """Emulator Configuration class."""
+
     columns = GeneralConfig.metadata + GeneralConfig.phys + GeneralConfig.species
     num_columns = len(columns)
 

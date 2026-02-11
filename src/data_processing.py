@@ -95,7 +95,7 @@ class Processing:
 
     ### PostProcessing Functions
 
-    def inverse_physical_parameter_scaling(self, physical_parameters: np.array):
+    def inverse_physical_parameter_scaling(self, physical_parameters: np.ndarray):
         """Reverses the minmax scaling of the physical parameters.
         Operates in-place.
         """
@@ -261,7 +261,7 @@ def calculate_emulator_indices(
 def preprocessing_emulator_dataset(
     GeneralConfig,
     EMConfig,
-    dataset_np: np.array,
+    dataset_np: np.ndarray,
     processing_functions: Processing,
     inference_functions: Inference,
 ):

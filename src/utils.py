@@ -45,7 +45,7 @@ def rename_columns(columns):
 
 
 def convertUCLCHEMbaseAvtoAv(
-    physical_parameters: np.array,
+    physical_parameters: np.ndarray,
 ):
     """This conversion is used internally in UCLCHEM. Our dataset has Av, although the dataset was generated using baseAv."""
     baseAv_idx = 2

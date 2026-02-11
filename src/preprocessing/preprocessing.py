@@ -1,9 +1,12 @@
+"""Preproccessing the uclchem gravitational collapse dataset."""
+
 import numpy as np
 import pandas as pd
 import torch
 
-import AstroChemNet.utils as utils
 from configs.general import GeneralConfig
+
+from .. import utils
 
 seed = 42
 torch.manual_seed(seed)

@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 
 from . import data_processing as dp
-from .configs import DatasetConfig, PredefinedTensors
+from .configs.general import GeneralConfig, PredefinedTensors
 
 
 def sample_initial_conditions(

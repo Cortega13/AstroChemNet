@@ -2,20 +2,21 @@
 
 import torch
 
-from AstroChemNet import data_loading as dl
-from AstroChemNet import data_processing as dp
-from AstroChemNet.inference import Inference
-from AstroChemNet.loss import Loss
-from AstroChemNet.trainer import AutoencoderTrainer, load_objects
 from configs.autoencoder import AEConfig
 from configs.general import GeneralConfig
-from nn_architectures.autoencoder import Autoencoder, load_autoencoder
+
+from .. import data_loading as dl
+from .. import data_processing as dp
+from ..inference import Inference
+from ..loss import Loss
+from ..models.autoencoder import Autoencoder, load_autoencoder
+from ..trainer import AutoencoderTrainer, load_objects
 
 
 def main(
     Autoencoder: type[Autoencoder],
-    GeneralConfig: type[GeneralConfig],
-    AEConfig: type[AEConfig],
+    GeneralConfig: GeneralConfig,
+    AEConfig: AEConfig,
 ):
     """Main _summary_.
 
@@ -73,4 +74,4 @@ def main(
 if __name__ == "__main__":
     print(f"Device: {GeneralConfig.device}")
     # Run main script.
-    main(Autoencoder, GeneralConfig, AEConfig)
+    main(Autoencoder, GeneralConfig(), AEConfig())

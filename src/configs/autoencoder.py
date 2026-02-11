@@ -1,9 +1,16 @@
+"""Configuration dataclasses for autoencoder."""
+
 import os
+from dataclasses import dataclass
+from pathlib import Path
 
 from configs.general import GeneralConfig
 
 
+@dataclass
 class AEConfig:
+    """Autoencoder Configuration class."""
+
     columns = GeneralConfig.species
     num_columns = len(columns)
     latents_minmax_path = os.path.join(
