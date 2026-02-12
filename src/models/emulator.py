@@ -1,11 +1,25 @@
+"""Emulator model for chemical abundance evolution prediction."""
+
 import os
 
 import torch
 import torch.nn as nn
 
+from configs.emulator import EMConfig
+from configs.general import GeneralConfig
+
 
 class Emulator(nn.Module):
-    def __init__(self, input_dim=18, output_dim=14, hidden_dim=32, dropout=0.0):
+    """Neural network emulator for predicting chemical evolution in latent space."""
+
+    def __init__(
+        self,
+        input_dim: int = 18,
+        output_dim: int = 14,
+        hidden_dim: int = 32,
+        dropout: float = 0.0,
+    ) -> None:
+        """Initialize emulator with MLP network for sequential prediction."""
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -18,7 +32,8 @@ class Emulator(nn.Module):
         )
         # self.gate_layer = nn.Linear(input_dim, output_dim)  # new
 
-    def forward(self, phys, latents):
+    def forward(self, phys: torch.Tensor, latents: torch.Tensor) -> torch.Tensor:
+        """Forward pass for sequential latent space evolution prediction."""
         B, T, P = phys.shape
         L = latents.shape[1]
         outputs = torch.empty(B, T, L, device=latents.device, dtype=latents.dtype)
@@ -36,8 +51,14 @@ class Emulator(nn.Module):
         return outputs
 
 
-def load_emulator(Emulator: Emulator, GeneralConfig, EMConfig, inference=False):
-    emulator = Emulator(
+def load_emulator(
+    emulator_class: type[Emulator],
+    GeneralConfig: GeneralConfig,
+    EMConfig: EMConfig,
+    inference: bool = False,
+) -> Emulator:
+    """Load emulator model with optional pretrained weights."""
+    emulator = emulator_class(
         input_dim=EMConfig.input_dim,
         output_dim=EMConfig.output_dim,
         hidden_dim=EMConfig.hidden_dim,

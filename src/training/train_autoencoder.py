@@ -1,4 +1,4 @@
-"""Script to train an autoencoder."""
+"""Training script for autoencoder model."""
 
 import torch
 
@@ -15,22 +15,16 @@ from ..trainer import AutoencoderTrainer, load_objects
 
 def main(
     Autoencoder: type[Autoencoder],
-    GeneralConfig: GeneralConfig,
-    AEConfig: AEConfig,
-):
-    """Main _summary_.
-
-    Args:
-        Autoencoder (type[Autoencoder]): nn.module of Autoencoder
-        GeneralConfig (type[GeneralConfig]): ConfigurationFile
-        AEConfig (type[AEConfig]): Autoencoder-specific configuration file.
-    """
-    processing_functions = dp.Processing(GeneralConfig, AEConfig)
+    general_config: GeneralConfig,
+    ae_config: AEConfig,
+) -> None:
+    """Train autoencoder model with given configuration."""
+    processing_functions = dp.Processing(general_config, ae_config)
 
     # stoichiometric_matrix = processing_functions.save_stoichiometric_matrix()
     # print(f"Stochiometry Matrix: {stoichiometric_matrix} | Shape: {stoichiometric_matrix.shape}")
 
-    training_np, validation_np = dl.load_datasets(GeneralConfig, AEConfig.columns)
+    training_np, validation_np = dl.load_datasets(general_config, ae_config.columns)
 
     processing_functions.abundances_scaling(training_np)
     processing_functions.abundances_scaling(validation_np)
@@ -40,20 +34,20 @@ def main(
     training_Dataset = dl.AutoencoderDataset(training_dataset)
     validation_Dataset = dl.AutoencoderDataset(validation_dataset)
 
-    training_dataloader = dl.tensor_to_dataloader(AEConfig, training_Dataset)
-    validation_dataloader = dl.tensor_to_dataloader(AEConfig, validation_Dataset)
+    training_dataloader = dl.tensor_to_dataloader(ae_config, training_Dataset)
+    validation_dataloader = dl.tensor_to_dataloader(ae_config, validation_Dataset)
 
-    autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig)
-    optimizer, scheduler = load_objects(autoencoder, AEConfig)
+    autoencoder = load_autoencoder(Autoencoder, general_config, ae_config)
+    optimizer, scheduler = load_objects(autoencoder, ae_config)
     loss_functions = Loss(
         processing_functions,
-        GeneralConfig,
-        ModelConfig=AEConfig,
+        general_config,
+        ModelConfig=ae_config,
     )
 
     autoencoder_trainer = AutoencoderTrainer(
-        GeneralConfig,
-        AEConfig,
+        general_config,
+        ae_config,
         loss_functions,
         autoencoder,
         optimizer,
@@ -65,9 +59,9 @@ def main(
     autoencoder_trainer.train()
 
     total_dataset = torch.vstack((training_dataset, validation_dataset))
-    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    inference_functions = Inference(general_config, processing_functions, autoencoder)
     processing_functions.save_latents_minmax(
-        AEConfig, total_dataset, inference_functions
+        ae_config, total_dataset, inference_functions
     )
 
 

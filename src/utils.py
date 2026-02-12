@@ -1,9 +1,13 @@
+"""Utility functions for data processing and transformation."""
+
+from typing import List
+
 import numpy as np
 import torch
 
 
-def rename_columns(columns):
-    """Renames column names containing chemical species using substring replacement."""
+def rename_columns(columns: List[str]) -> List[str]:
+    """Rename column names containing chemical species using substring replacement."""
     name_mapping = {
         "H2COH+": "H3CO+",
         "H2COH": "H3CO",
@@ -44,10 +48,8 @@ def rename_columns(columns):
     return new_columns
 
 
-def convertUCLCHEMbaseAvtoAv(
-    physical_parameters: np.ndarray,
-):
-    """This conversion is used internally in UCLCHEM. Our dataset has Av, although the dataset was generated using baseAv."""
+def convertUCLCHEMbaseAvtoAv(physical_parameters: np.ndarray) -> None:
+    """Convert baseAv to Av using UCLCHEM internal conversion formula."""
     baseAv_idx = 2
     density_idx = 0
     multiplier = 0.0000964375
@@ -59,9 +61,12 @@ def convertUCLCHEMbaseAvtoAv(
     )
 
 
-def reconstruct_emulated_outputs(encoded_inputs, emulated_outputs):
-    """Adds the time and physical parameter columns to the latent components."""
-    num_physical_parameters = DatasetConfig.num_physical_parameters
+def reconstruct_emulated_outputs(
+    encoded_inputs: torch.Tensor,
+    emulated_outputs: torch.Tensor,
+    num_physical_parameters: int,
+) -> torch.Tensor:
+    """Add time and physical parameter columns to the latent components."""
     reconstructed_emulated_outputs = torch.cat(
         (encoded_inputs[:, : 1 + num_physical_parameters], emulated_outputs), dim=1
     )

@@ -1,9 +1,12 @@
+"""Trainer classes for autoencoder and emulator models."""
+
 import copy
 import gc
 import json
 import os
 from abc import abstractmethod
 from datetime import datetime
+from typing import TYPE_CHECKING, Tuple, cast
 
 import numpy as np
 import torch
@@ -11,6 +14,7 @@ from torch import optim
 from torch.backends import cudnn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 from configs.autoencoder import AEConfig
 from configs.emulator import EMConfig
@@ -29,6 +33,8 @@ torch.autograd.set_detect_anomaly(True)
 
 
 class Trainer:
+    """Base trainer class with common training functionality."""
+
     def __init__(
         self,
         GeneralConfig: GeneralConfig,
@@ -39,7 +45,7 @@ class Trainer:
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """Initializes the Trainer class. A class which simplifies training by including all necessary components."""
+        """Initialize the Trainer with model, optimizer, and data loaders."""
         self.device = GeneralConfig.device
         self.start_time = datetime.now()
         self.model_config = model_config
@@ -61,47 +67,42 @@ class Trainer:
         self.stagnant_epochs = 0
         self.loss_per_epoch = []
 
-    def save_loss_per_epoch(self):
-        """Saves the loss per epoch to a file."""
+    def save_loss_per_epoch(self) -> None:
+        """Save the loss per epoch to a JSON file."""
         epochs_path = os.path.splitext(self.model_config.save_model_path)[0] + ".json"
         with open(epochs_path, "w") as f:
             json.dump(self.loss_per_epoch, f, indent=4)
 
-    def print_final_time(self):
-        """Prints the total training time."""
+    def print_final_time(self) -> None:
+        """Print the total training time and number of epochs."""
         end_time = datetime.now()
         total_time = end_time - self.start_time
         print(f"Total Training Time: {total_time}")
         print(f"Total Epochs: {len(self.loss_per_epoch)}")
 
-    def _save_checkpoint(self):
-        """Saves the model's state dictionary to a file."""
+    def _save_checkpoint(self) -> None:
+        """Save the model's state dictionary to a file."""
         checkpoint = self.model.state_dict()
         model_path = os.path.join(self.model_config.save_model_path)
         if self.model_config.save_model:
             torch.save(checkpoint, model_path)
 
-    def set_dropout_rate(self, dropout_rate):
-        """Sets the dropout rate for all dropout layers in the model."""
+    def set_dropout_rate(self, dropout_rate: float) -> None:
+        """Set the dropout rate for all dropout layers in the model."""
         for module in self.model.modules():
             if isinstance(module, torch.nn.Dropout):
                 module.p = dropout_rate
         self.current_dropout_rate = dropout_rate
 
-    def _check_early_stopping(self):
-        """Ends training once the number of stagnant epochs exceeds the patience."""
+    def _check_early_stopping(self) -> bool:
+        """Check if training should stop due to stagnant epochs."""
         if self.stagnant_epochs >= self.model_config.stagnant_epoch_patience:
             print("Ending training early due to stagnant epochs.")
             return True
         return False
 
-    def _check_minimum_loss(self):
-        """Checks if the current epoch's validation loss is the minimum loss so far.
-
-        Calculates the mean relative error and the std of the species-wise mean relative error.
-        Uses a metric for the minimum loss which gives weight to the mean and std relative errors.
-        Includes a scheduler to reduce the learning rate once the minimum loss stagnates.
-        """
+    def _check_minimum_loss(self) -> None:
+        """Check if current validation loss is minimum and update best weights accordingly."""
         val_loss = self.epoch_validation_loss / self.num_validation_elements
         mean_loss = val_loss.mean().item()
         std_loss = val_loss.std().item()
@@ -167,13 +168,14 @@ class Trainer:
         print(f"Current Num Epochs: {len(self.loss_per_epoch)}")
 
     @abstractmethod
-    def _run_epoch(self, epoch):
-        return NotImplementedError("This method should be implemented in subclasses.")
+    def _run_epoch(self, epoch: int) -> None:
+        """Run a single training and validation epoch."""
+        raise NotImplementedError("This method should be implemented in subclasses.")
 
-    def train(self):
-        """Training loop for the autoencoder. Runs until the minimum loss stagnates for a number of epochs."""
+    def train(self) -> None:
+        """Run training loop until early stopping criterion is met."""
         gc.collect()
-        if self.device == "cuda":
+        if str(self.device) == "cuda":
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
@@ -184,7 +186,7 @@ class Trainer:
                 break
 
         gc.collect()
-        if self.device == "cuda":
+        if str(self.device) == "cuda":
             torch.cuda.empty_cache()
         print(f"\nTraining Complete. Trial Results: {self.metric_minimum_loss}")
         self.print_final_time()
@@ -192,6 +194,8 @@ class Trainer:
 
 
 class AutoencoderTrainer(Trainer):
+    """Trainer specialized for autoencoder models."""
+
     def __init__(
         self,
         GeneralConfig: GeneralConfig,
@@ -203,7 +207,7 @@ class AutoencoderTrainer(Trainer):
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """Initializes the AutoencoderTrainer, a subclass of Trainer, specialized for training the autoencoder."""
+        """Initialize AutoencoderTrainer with model config, loss functions, and data loaders."""
         self.num_metadata = GeneralConfig.num_metadata
         self.num_phys = GeneralConfig.phys
         self.num_species = GeneralConfig.num_species
@@ -224,8 +228,8 @@ class AutoencoderTrainer(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-    def _run_training_batch(self, features):
-        """Runs a training batch where features = targets since this is an autoencoder."""
+    def _run_training_batch(self, features: torch.Tensor) -> None:
+        """Run a training batch where features = targets (autoencoder)."""
         self.optimizer.zero_grad()
         outputs = self.model(features)
         loss = self.training_loss(
@@ -237,17 +241,18 @@ class AutoencoderTrainer(Trainer):
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
 
-    def _run_validation_batch(self, features: torch.Tensor):
-        """Runs a validation batch where features = targets since this is an autoencoder."""
+    def _run_validation_batch(self, features: torch.Tensor) -> None:
+        """Run a validation batch where features = targets (autoencoder)."""
         component_outputs = self.model.encode(features)
         outputs = self.model.decode(component_outputs)
 
         loss = self.validation_loss(outputs, features)
         self.epoch_validation_loss += loss
 
-    def _run_epoch(self, epoch):
-        """Since this is an autoencoder, there are no targets and thus the dataloaderss only have features."""
-        self.training_dataloader.sampler.set_epoch(epoch)
+    def _run_epoch(self, epoch: int) -> None:
+        """Run training and validation for one epoch (autoencoder has no targets)."""
+        sampler = cast(DistributedSampler, self.training_dataloader.sampler)
+        sampler.set_epoch(epoch)
 
         tic1 = datetime.now()
         self.model.train()
@@ -267,9 +272,11 @@ class AutoencoderTrainer(Trainer):
 
 
 class EmulatorTrainerSequential(Trainer):
+    """Trainer for emulator models using sequential processing."""
+
     def __init__(
         self,
-        GeneralConfig,
+        GeneralConfig: GeneralConfig,
         AEConfig: AEConfig,
         EMConfig: EMConfig,
         loss_functions: Loss,
@@ -281,7 +288,7 @@ class EmulatorTrainerSequential(Trainer):
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """Initializes the EmulatorTrainer, a subclass of Trainer, specialized for train the emulator."""
+        """Initialize EmulatorTrainerSequential with autoencoder and emulator configs."""
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
@@ -301,8 +308,10 @@ class EmulatorTrainerSequential(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-    def _run_training_batch(self, phys, features, targets):
-        """Runs a single training batch."""
+    def _run_training_batch(
+        self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
+    ) -> None:
+        """Run a single training batch for the emulator."""
         self.optimizer.zero_grad()
 
         outputs = self.model(phys, features)
@@ -317,8 +326,10 @@ class EmulatorTrainerSequential(Trainer):
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
         self.optimizer.step()
 
-    def _run_validation_batch(self, phys, features, targets):
-        """Runs a single validation batch."""
+    def _run_validation_batch(
+        self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
+    ) -> None:
+        """Run a single validation batch for the emulator."""
         outputs = self.model(phys, features)
 
         outputs = outputs.reshape(-1, self.latent_dim)
@@ -330,9 +341,10 @@ class EmulatorTrainerSequential(Trainer):
 
         self.epoch_validation_loss += loss.detach()
 
-    def _run_epoch(self, epoch):
-        """Runs a single epoch of training and validation, profiling the first 10 training batches."""
-        self.training_dataloader.sampler.set_epoch(epoch)
+    def _run_epoch(self, epoch: int) -> None:
+        """Run a single epoch of training and validation for the emulator."""
+        sampler = cast(DistributedSampler, self.training_dataloader.sampler)
+        sampler.set_epoch(epoch)
         tic1 = datetime.now()
 
         self.model.train()
@@ -357,7 +369,10 @@ class EmulatorTrainerSequential(Trainer):
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")
 
 
-def load_objects(model, config):
+def load_objects(
+    model: Autoencoder | Emulator, config: AEConfig | EMConfig
+) -> Tuple[torch.optim.Optimizer, ReduceLROnPlateau]:
+    """Create optimizer and learning rate scheduler for the model."""
     optimizer = optim.AdamW(
         model.parameters(),
         lr=config.lr,

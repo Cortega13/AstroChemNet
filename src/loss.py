@@ -1,9 +1,25 @@
+"""Loss functions for autoencoder and emulator training."""
+
+from typing import Optional, Tuple
+
 import numpy as np
 import torch
 
+from configs.autoencoder import AEConfig
+from configs.emulator import EMConfig
+from configs.general import GeneralConfig
+
 
 class Loss:
-    def __init__(self, processing_functions, GeneralConfig, ModelConfig=None):
+    """Loss functions for training autoencoder and emulator models."""
+
+    def __init__(
+        self,
+        processing_functions,
+        GeneralConfig: GeneralConfig,
+        ModelConfig: Optional[AEConfig | EMConfig] = None,
+    ) -> None:
+        """Initialize Loss with processing functions and configuration."""
         device = GeneralConfig.device
         stoichiometric_matrix = np.load(GeneralConfig.stoichiometric_matrix_path)
         self.stoichiometric_matrix = torch.tensor(
@@ -29,7 +45,8 @@ class Loss:
         targets: torch.Tensor,
         exponential: torch.Tensor,
         power_weight: torch.Tensor,
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Calculate elementwise exponential loss with mean and worst case."""
         elementwise_loss = torch.abs(outputs - targets)
         elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
 
@@ -43,8 +60,8 @@ class Loss:
         self,
         tensor1: torch.Tensor,
         tensor2: torch.Tensor,
-    ):
-        """Given the actual and predicted abundances, this function calculates a loss between the elemental abundances of both."""
+    ) -> torch.Tensor:
+        """Calculate loss between elemental abundances of actual and predicted."""
         unscaled_tensor1 = self.inverse_abundances_scaling(tensor1)
         unscaled_tensor2 = self.inverse_abundances_scaling(tensor2)
 
@@ -67,11 +84,8 @@ class Loss:
         outputs: torch.Tensor,
         targets: torch.Tensor,
         alpha: float = 2,
-    ):
-        """This is the custom loss function for the autoencoder.
-        It's a combination of the reconstruction loss, conservation loss,
-        and a penalty on the worst-performing species.
-        """
+    ) -> torch.Tensor:
+        """Calculate combined training loss with reconstruction and conservation."""
         mean_loss, worst_loss = self.elementwise_loss(
             outputs, targets, self.exponential, self.power_weight
         )
@@ -89,8 +103,8 @@ class Loss:
         )
         return total_loss
 
-    def validation(self, outputs, targets):
-        """This is the custom loss function for the autoencoder. It's a combination of the reconstruction loss and the conservation loss."""
+    def validation(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Calculate validation loss as relative error per species."""
         unscaled_outputs = self.inverse_abundances_scaling(outputs)
         unscaled_targets = self.inverse_abundances_scaling(targets)
 

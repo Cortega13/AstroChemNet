@@ -1,19 +1,28 @@
+"""Autoencoder model for chemical abundance encoding and decoding."""
+
 import os
+from typing import Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from configs.autoencoder import AEConfig
+from configs.general import GeneralConfig
+
 
 class Autoencoder(nn.Module):
+    """Autoencoder neural network for encoding/decoding chemical abundances."""
+
     def __init__(
         self,
-        input_dim=333,
-        latent_dim=12,
-        hidden_dims=(320, 160),
-        noise=0.1,
-        dropout=0.0,
-    ):
+        input_dim: int = 333,
+        latent_dim: int = 12,
+        hidden_dims: Tuple[int, ...] = (320, 160),
+        noise: float = 0.1,
+        dropout: float = 0.0,
+    ) -> None:
+        """Initialize autoencoder with encoder and decoder layers."""
         super(Autoencoder, self).__init__()
 
         self.encoder_fc1 = nn.Linear(input_dim, hidden_dims[0], bias=False)
@@ -36,6 +45,7 @@ class Autoencoder(nn.Module):
         self.noise = noise
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode input tensor to latent space representation."""
         x = self.activation(self.encoder_bn1(self.encoder_fc1(x)))
         x = self.activation(self.encoder_bn2(self.encoder_fc2(x)))
         x = self.dropout(x)
@@ -43,6 +53,7 @@ class Autoencoder(nn.Module):
         return z
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
+        """Decode latent space representation back to input space."""
         z = F.linear(z, self.encoder_fc3.weight.t()) + self.decoder_bias1
         z = self.activation(self.decoder_bn1(z))
 
@@ -55,6 +66,7 @@ class Autoencoder(nn.Module):
         return x_reconstructed
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through encoder and decoder with optional noise."""
         z = self.encode(x)
         if self.training and self.noise > 0:
             noise = torch.randn_like(z) * self.noise
@@ -64,9 +76,13 @@ class Autoencoder(nn.Module):
 
 
 def load_autoencoder(
-    Autoencoder: type[Autoencoder], GeneralConfig, AEConfig, inference=False
-):
-    autoencoder = Autoencoder(
+    autoencoder_class: type[Autoencoder],
+    GeneralConfig: GeneralConfig,
+    AEConfig: AEConfig,
+    inference: bool = False,
+) -> Autoencoder:
+    """Load autoencoder model with optional pretrained weights."""
+    autoencoder = autoencoder_class(
         input_dim=AEConfig.input_dim,
         latent_dim=AEConfig.latent_dim,
         hidden_dims=AEConfig.hidden_dims,

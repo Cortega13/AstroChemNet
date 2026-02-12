@@ -1,71 +1,85 @@
-from AstroChemNet import data_loading as dl
-from AstroChemNet import data_processing as dp
-from AstroChemNet.inference import Inference
-from AstroChemNet.loss import Loss
-from AstroChemNet.trainer import EmulatorTrainerSequential, load_objects
+"""Training script for emulator model."""
+
 from configs.autoencoder import AEConfig
 from configs.emulator import EMConfig
 from configs.general import GeneralConfig
-from nn_architectures.autoencoder import Autoencoder, load_autoencoder
-from nn_architectures.emulator import Emulator, load_emulator
+
+from .. import data_loading as dl
+from .. import data_processing as dp
+from ..inference import Inference
+from ..loss import Loss
+from ..models.autoencoder import Autoencoder, load_autoencoder
+from ..models.emulator import Emulator, load_emulator
+from ..trainer import EmulatorTrainerSequential, load_objects
 
 
-def main():
-    print(GeneralConfig.device)
+def main() -> None:
+    """Train emulator model with given configuration."""
+    general_config = GeneralConfig()
+    ae_config = AEConfig()
+    em_config = EMConfig()
+
+    print(general_config.device)
     processing_functions = dp.Processing(
-        GeneralConfig,
-        AEConfig,
+        general_config,
+        ae_config,
     )
-    autoencoder = load_autoencoder(Autoencoder, GeneralConfig, AEConfig, inference=True)
-    inference_functions = Inference(GeneralConfig, processing_functions, autoencoder)
+    autoencoder = load_autoencoder(
+        Autoencoder, general_config, ae_config, inference=True
+    )
+    inference_functions = Inference(general_config, processing_functions, autoencoder)
 
-    training_np, validation_np = dl.load_datasets(GeneralConfig, EMConfig.columns)
+    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
     training_dataset = dp.preprocessing_emulator_dataset(
-        GeneralConfig, EMConfig, training_np, processing_functions, inference_functions
+        general_config,
+        em_config,
+        training_np,
+        processing_functions,
+        inference_functions,
     )
     validation_dataset = dp.preprocessing_emulator_dataset(
-        GeneralConfig,
-        EMConfig,
+        general_config,
+        em_config,
         validation_np,
         processing_functions,
         inference_functions,
     )
 
-    dl.save_tensors_to_hdf5(GeneralConfig, training_dataset, category="training_seq")
+    dl.save_tensors_to_hdf5(general_config, training_dataset, category="training_seq")
     dl.save_tensors_to_hdf5(
-        GeneralConfig, validation_dataset, category="validation_seq"
+        general_config, validation_dataset, category="validation_seq"
     )
 
     # training_dataset, training_indices = dl.load_tensors_from_hdf5(
-    #     GeneralConfig, category="training_seq"
+    #     general_config, category="training_seq"
     # )
     # validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
-    #     GeneralConfig, category="validation_seq"
+    #     general_config, category="validation_seq"
     # )
 
     # training_Dataset = dl.EmulatorSequenceDataset(
-    #     GeneralConfig, AEConfig, training_dataset, training_indices
+    #     general_config, ae_config, training_dataset, training_indices
     # )
     # validation_Dataset = dl.EmulatorSequenceDataset(
-    #     GeneralConfig, AEConfig, validation_dataset, validation_indices
+    #     general_config, ae_config, validation_dataset, validation_indices
     # )
     # del training_dataset, validation_dataset, training_indices, validation_indices
 
-    # training_dataloader = dl.tensor_to_dataloader(EMConfig, training_Dataset)
-    # validation_dataloader = dl.tensor_to_dataloader(EMConfig, validation_Dataset)
+    # training_dataloader = dl.tensor_to_dataloader(em_config, training_Dataset)
+    # validation_dataloader = dl.tensor_to_dataloader(em_config, validation_Dataset)
 
-    # emulator = load_emulator(Emulator, GeneralConfig, EMConfig)
-    # optimizer, scheduler = load_objects(emulator, EMConfig)
+    # emulator = load_emulator(Emulator, general_config, em_config)
+    # optimizer, scheduler = load_objects(emulator, em_config)
 
     # loss_functions = Loss(
     #     processing_functions,
-    #     GeneralConfig,
-    #     ModelConfig=EMConfig,
+    #     general_config,
+    #     ModelConfig=em_config,
     # )
     # emulator_trainer = EmulatorTrainerSequential(
-    #     GeneralConfig,
-    #     AEConfig,
-    #     EMConfig,
+    #     general_config,
+    #     ae_config,
+    #     em_config,
     #     loss_functions,
     #     processing_functions,
     #     autoencoder,

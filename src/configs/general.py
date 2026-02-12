@@ -1,4 +1,4 @@
-"""Runtime configuration file."""
+"""General runtime and dataset configuration."""
 
 import os
 from dataclasses import dataclass
@@ -9,7 +9,7 @@ import torch
 
 @dataclass
 class GeneralConfig:
-    """General configuration file for runtime/dataset information."""
+    """General configuration for runtime and dataset information."""
 
     working_path = os.path.dirname(
         os.path.dirname((os.path.abspath(__file__)))

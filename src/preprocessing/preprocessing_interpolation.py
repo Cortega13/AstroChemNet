@@ -1,9 +1,11 @@
+"""Preprocessing script for UCLCHEM dataset with interpolation-based train/val split."""
+
+# sys.path.append(".")
+import AstroChemNet.utils as utils
 import numpy as np
 import pandas as pd
 import torch
 
-# sys.path.append(".")
-import AstroChemNet.utils as utils
 from configs.general import GeneralConfig
 
 seed = 42

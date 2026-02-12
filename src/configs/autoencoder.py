@@ -1,15 +1,14 @@
-"""Configuration dataclasses for autoencoder."""
+"""Configuration dataclass for autoencoder model."""
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 
 from configs.general import GeneralConfig
 
 
 @dataclass
 class AEConfig:
-    """Autoencoder Configuration class."""
+    """Autoencoder model configuration with hyperparameters and paths."""
 
     columns = GeneralConfig.species
     num_columns = len(columns)

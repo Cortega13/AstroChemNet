@@ -1,4 +1,4 @@
-"""Configuration dataclasses for emulator."""
+"""Configuration dataclass for emulator model."""
 
 import os
 from dataclasses import dataclass
@@ -9,7 +9,7 @@ from configs.general import GeneralConfig
 
 @dataclass
 class EMConfig:
-    """Emulator Configuration class."""
+    """Emulator model configuration with hyperparameters and paths."""
 
     columns = GeneralConfig.metadata + GeneralConfig.phys + GeneralConfig.species
     num_columns = len(columns)

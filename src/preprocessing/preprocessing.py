@@ -1,4 +1,4 @@
-"""Preproccessing the uclchem gravitational collapse dataset."""
+"""Preprocessing script for UCLCHEM gravitational collapse dataset."""
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ df_inits["Density"] = 0
 
 df = pd.read_hdf("data/gravitational_collapse.h5", key="df", start=0)
 df = df.drop(columns=["dustTemp", "dstep", "zeta", "SURFACE", "BULK"])
-df.columns = utils.rename_columns(df.columns)
+df.columns = utils.rename_columns(list(df.columns))
 
 species = [
     col for col in df.columns if col not in GeneralConfig.metadata + GeneralConfig.phys
