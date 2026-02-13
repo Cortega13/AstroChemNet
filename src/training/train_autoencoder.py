@@ -2,8 +2,8 @@
 
 import torch
 
-from configs.autoencoder import AEConfig
-from configs.general import GeneralConfig
+from src.configs.autoencoder import AEConfig
+from src.configs.general import GeneralConfig
 
 from .. import data_loading as dl
 from .. import data_processing as dp

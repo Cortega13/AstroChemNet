@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from configs.autoencoder import AEConfig
-from configs.general import GeneralConfig
+from src.configs.autoencoder import AEConfig
+from src.configs.general import GeneralConfig
 
 
 class Autoencoder(nn.Module):

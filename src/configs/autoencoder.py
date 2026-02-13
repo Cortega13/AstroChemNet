@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass
 
-from configs.general import GeneralConfig
+from src.configs.general import GeneralConfig
 
 
 @dataclass
@@ -13,7 +13,7 @@ class AEConfig:
     columns = GeneralConfig.species
     num_columns = len(columns)
     latents_minmax_path = os.path.join(
-        GeneralConfig.working_path, "utils/latents_minmax.npy"
+        GeneralConfig.project_root, "outputs/utils/latents_minmax.npy"
     )
 
     # Model
@@ -41,8 +41,8 @@ class AEConfig:
     # Paths
     save_model = True
     pretrained_model_path = os.path.join(
-        GeneralConfig.working_path, "weights/autoencoder.pth"
+        GeneralConfig.project_root, "outputs/weights/autoencoder.pth"
     )
     save_model_path = os.path.join(
-        GeneralConfig.working_path, "weights/autoencoder.pth"
+        GeneralConfig.project_root, "outputs/weights/autoencoder.pth"
     )

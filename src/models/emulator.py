@@ -5,8 +5,8 @@ import os
 import torch
 import torch.nn as nn
 
-from configs.emulator import EMConfig
-from configs.general import GeneralConfig
+from src.configs.emulator import EMConfig
+from src.configs.general import GeneralConfig
 
 
 class Emulator(nn.Module):

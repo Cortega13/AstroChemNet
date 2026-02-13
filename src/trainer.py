@@ -6,7 +6,7 @@ import json
 import os
 from abc import abstractmethod
 from datetime import datetime
-from typing import TYPE_CHECKING, Tuple, cast
+from typing import Tuple, cast
 
 import numpy as np
 import torch
@@ -16,14 +16,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from configs.autoencoder import AEConfig
-from configs.emulator import EMConfig
-from configs.general import GeneralConfig
-from models.autoencoder import Autoencoder
-from models.emulator import Emulator
+from src.configs.autoencoder import AEConfig
+from src.configs.emulator import EMConfig
+from src.configs.general import GeneralConfig
+from src.models.autoencoder import Autoencoder
+from src.models.emulator import Emulator
 
 from . import data_processing as dp
-from .inference import Inference
 from .loss import Loss
 
 cudnn.benchmark = True
@@ -55,7 +54,7 @@ class Trainer:
         self.scheduler = scheduler
         self.training_dataloader = training_dataloader
         self.validation_dataloader = validation_dataloader
-        self.num_validation_elements = len(self.validation_dataloader.dataset)
+        self.num_validation_elements = len(self.validation_dataloader.dataset)  # type:ignore
 
         self.current_dropout_rate = self.model_config.dropout
         self.current_learning_rate = self.model_config.lr
@@ -146,7 +145,10 @@ class Trainer:
                         f"Decreasing dropout rate to {self.current_dropout_rate:.4f} and settings lr to {self.current_learning_rate:.4f}."
                     )
 
-            if self.stagnant_epochs == self.model_config.lr_decay_patience + 1:
+            if (
+                self.stagnant_epochs == self.model_config.lr_decay_patience + 1
+                and self.best_weights
+            ):
                 print("Reverting to previous best weights")
                 self.model.load_state_dict(self.best_weights)
 
@@ -243,8 +245,8 @@ class AutoencoderTrainer(Trainer):
 
     def _run_validation_batch(self, features: torch.Tensor) -> None:
         """Run a validation batch where features = targets (autoencoder)."""
-        component_outputs = self.model.encode(features)
-        outputs = self.model.decode(component_outputs)
+        component_outputs = self.ae.encode(features)
+        outputs = self.ae.decode(component_outputs)
 
         loss = self.validation_loss(outputs, features)
         self.epoch_validation_loss += loss

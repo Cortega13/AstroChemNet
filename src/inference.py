@@ -5,9 +5,9 @@ from typing import Optional
 import numpy as np
 import torch
 
-from configs.general import GeneralConfig
-from models.autoencoder import Autoencoder
-from models.emulator import Emulator
+from src.configs.general import GeneralConfig
+from src.models.autoencoder import Autoencoder
+from src.models.emulator import Emulator
 
 
 class Inference:

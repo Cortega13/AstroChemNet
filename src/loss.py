@@ -5,9 +5,9 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 
-from configs.autoencoder import AEConfig
-from configs.emulator import EMConfig
-from configs.general import GeneralConfig
+from src.configs.autoencoder import AEConfig
+from src.configs.emulator import EMConfig
+from src.configs.general import GeneralConfig
 
 
 class Loss:

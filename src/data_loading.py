@@ -10,8 +10,8 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from configs.autoencoder import AEConfig
-from configs.general import GeneralConfig
+from src.configs.autoencoder import AEConfig
+from src.configs.general import GeneralConfig
 
 
 def load_datasets(

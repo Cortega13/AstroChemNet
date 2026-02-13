@@ -3,8 +3,8 @@
 import os
 from dataclasses import dataclass
 
-from configs.autoencoder import AEConfig
-from configs.general import GeneralConfig
+from src.configs.autoencoder import AEConfig
+from src.configs.general import GeneralConfig
 
 
 @dataclass
@@ -39,5 +39,9 @@ class EMConfig:
 
     # Paths
     save_model = False
-    pretrained_model_path = os.path.join(GeneralConfig.working_path, "weights/mlp.pth")
-    save_model_path = os.path.join(GeneralConfig.working_path, "weights/mlp.pth")
+    pretrained_model_path = os.path.join(
+        GeneralConfig.project_root, "outputs/weights/mlp.pth"
+    )
+    save_model_path = os.path.join(
+        GeneralConfig.project_root, "outputs/weights/mlp.pth"
+    )
