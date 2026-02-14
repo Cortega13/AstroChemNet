@@ -2,7 +2,6 @@
 
 from typing import Optional, Tuple
 
-import numpy as np
 import torch
 
 from src.configs.autoencoder import AEConfig
@@ -21,9 +20,8 @@ class Loss:
     ) -> None:
         """Initialize Loss with processing functions and configuration."""
         device = GeneralConfig.device
-        stoichiometric_matrix = np.load(GeneralConfig.stoichiometric_matrix_path)
         self.stoichiometric_matrix = torch.tensor(
-            stoichiometric_matrix, dtype=torch.float32, device=device
+            GeneralConfig.stoichiometric_matrix, dtype=torch.float32, device=device
         )
         self.exponential = torch.log(torch.tensor(10, device=device).float())
 

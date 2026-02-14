@@ -21,9 +21,6 @@ def main(
     """Train autoencoder model with given configuration."""
     processing_functions = dp.Processing(general_config, ae_config)
 
-    # stoichiometric_matrix = processing_functions.save_stoichiometric_matrix()
-    # print(f"Stochiometry Matrix: {stoichiometric_matrix} | Shape: {stoichiometric_matrix.shape}")
-
     training_np, validation_np = dl.load_datasets(general_config, ae_config.columns)
 
     processing_functions.abundances_scaling(training_np)
@@ -66,6 +63,10 @@ def main(
 
 
 if __name__ == "__main__":
-    print(f"Device: {GeneralConfig.device}")
+    # Instantiate configs - GeneralConfig loads from preprocessing output
+    general_config = GeneralConfig(dataset_name="uclchem_grav")
+    ae_config = AEConfig(general_config=general_config)
+
+    print(f"Device: {general_config.device}")
     # Run main script.
-    main(Autoencoder, GeneralConfig(), AEConfig())
+    main(Autoencoder, general_config, ae_config)

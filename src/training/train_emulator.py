@@ -13,12 +13,14 @@ from ..models.emulator import Emulator, load_emulator
 from ..trainer import EmulatorTrainerSequential, load_objects
 
 
-def main() -> None:
+def main(
+    Autoencoder: type[Autoencoder],
+    Emulator: type[Emulator],
+    general_config: GeneralConfig,
+    ae_config: AEConfig,
+    em_config: EMConfig,
+) -> None:
     """Train emulator model with given configuration."""
-    general_config = GeneralConfig()
-    ae_config = AEConfig()
-    em_config = EMConfig()
-
     print(general_config.device)
     processing_functions = dp.Processing(
         general_config,
@@ -93,5 +95,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Instantiate configs - GeneralConfig loads from preprocessing output
+    general_config = GeneralConfig(dataset_name="uclchem_grav")
+    ae_config = AEConfig(general_config=general_config)
+    em_config = EMConfig(general_config=general_config, ae_config=ae_config)
+
     # Run main script.
-    main()
+    main(Autoencoder, Emulator, general_config, ae_config, em_config)

@@ -1,8 +1,7 @@
 """Data processing functions for preprocessing and postprocessing data scaling."""
 
 import gc
-import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -50,7 +49,6 @@ class Processing:
         self.physical_parameter_ranges = GeneralConfig.physical_parameter_ranges
         self.species = GeneralConfig.species
         self.num_species = GeneralConfig.num_species
-        self.stoichiometric_matrix_path = GeneralConfig.stoichiometric_matrix_path
 
     ### PreProcessing Functions
 
@@ -173,35 +171,6 @@ class Processing:
         minmax_np = np.array([min_, max_], dtype=np.float32)
         print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
         np.save(AEConfig.latents_minmax_path, minmax_np)
-
-    def build_stoichiometric_matrix(self) -> np.ndarray:
-        """Build stoichiometric matrix S where x @ S gives elemental abundances."""
-        elements = ["H", "HE", "C", "N", "O", "S", "SI", "MG", "CL"]
-        stoichiometric_matrix = np.zeros((len(elements), self.num_species))
-        modified_species = [s.replace("@", "").replace("#", "") for s in self.species]
-
-        elements_patterns = {
-            "H": re.compile(r"H(?!E)(\d*)"),
-            "HE": re.compile(r"HE(\d*)"),
-            "C": re.compile(r"C(?!L)(\d*)"),
-            "N": re.compile(r"N(\d*)"),
-            "O": re.compile(r"O(\d*)"),
-            "S": re.compile(r"S(?!I)(\d*)"),
-            "SI": re.compile(r"SI(\d*)"),
-            "MG": re.compile(r"MG(\d*)"),
-            "CL": re.compile(r"CL(\d*)"),
-        }
-
-        for element, pattern in elements_patterns.items():
-            elem_index = elements.index(element)
-            for i, species in enumerate(modified_species):
-                match = pattern.search(species)
-                if match and species not in ["SURFACE", "BULK"]:
-                    multiplier = int(match.group(1)) if match.group(1) else 1
-                    stoichiometric_matrix[elem_index, i] = multiplier
-
-        np.save(self.stoichiometric_matrix_path, stoichiometric_matrix.T)
-        return stoichiometric_matrix.T
 
 
 @njit

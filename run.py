@@ -18,7 +18,7 @@ def main() -> None:
 Examples:
   python run.py train autoencoder     Train the autoencoder model
   python run.py train emulator        Train the emulator model
-  python run.py preprocess gravitational_collapse  Preprocess dataset
+  python run.py preprocess uclchem_grav  Preprocess dataset
   python run.py benchmark combined    Benchmark full pipeline
         """,
     )
@@ -36,7 +36,7 @@ Examples:
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=["gravitational_collapse"],
+        choices=["uclchem_grav"],
         help="Dataset to preprocess",
     )
 
