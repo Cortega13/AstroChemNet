@@ -1,6 +1,7 @@
 data/*
 !data/
 !data/README.md
+outputs/*
 
 models/backups/
 grid_folder/

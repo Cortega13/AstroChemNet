@@ -39,6 +39,11 @@ Examples:
         choices=["uclchem_grav"],
         help="Dataset to preprocess",
     )
+    preprocess_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing preprocessing output",
+    )
 
     # Benchmark subcommand
     benchmark_parser = subparsers.add_parser("benchmark", help="Benchmark models")
@@ -56,7 +61,7 @@ Examples:
     if args.command == "train":
         handle_train(args.model)
     elif args.command == "preprocess":
-        handle_preprocess(args.dataset)
+        handle_preprocess(args.dataset, force=args.force)
     elif args.command == "benchmark":
         handle_benchmark(args.model)
     else:
