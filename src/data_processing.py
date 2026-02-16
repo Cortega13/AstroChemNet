@@ -152,26 +152,6 @@ class Processing:
             scaled_components, self.components_min, self.components_max
         )
 
-    def save_latents_minmax(
-        self,
-        AEConfig: AEConfig,
-        dataset_t: torch.Tensor,
-        inference_functions: Inference,
-    ) -> None:
-        """Compute and save min/max values of latent components for scaling."""
-        min_, max_ = float("inf"), float("-inf")
-
-        with torch.no_grad():
-            for i in range(0, len(dataset_t), AEConfig.batch_size):
-                batch = dataset_t[i : i + AEConfig.batch_size].to(self.device)
-                encoded = inference_functions.encode(batch).cpu()
-                min_ = min(min_, encoded.min().item())
-                max_ = max(max_, encoded.max().item())
-
-        minmax_np = np.array([min_, max_], dtype=np.float32)
-        print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
-        np.save(AEConfig.latents_minmax_path, minmax_np)
-
 
 @njit
 def calculate_emulator_indices(

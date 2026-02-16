@@ -5,7 +5,6 @@ import json
 import math
 import os
 from datetime import datetime, timezone
-from typing import Callable, Dict
 
 import numpy as np
 import pandas as pd
@@ -224,16 +223,12 @@ def preprocess_uclchem_grav(
     os.makedirs(output_dir, exist_ok=True)
 
     # Load initial abundances from old location
-    old_utils_path = os.path.join(project_root, "outputs", "utils")
-    initial_abundances = np.load(os.path.join(old_utils_path, "initial_abundances.npy"))
+    initial_abundances = np.load(os.path.join(output_dir, "initial_abundances.npy"))
 
-    # Load old species list for initial abundances
-    old_species = np.loadtxt(
-        os.path.join(old_utils_path, "species.txt"),
-        dtype=str,
-        delimiter=" ",
-        comments=None,
-    ).tolist()
+    # Load species list for initial abundances
+    with open(os.path.join(output_dir, "species.json"), "r") as f:
+        species_data = json.load(f)
+    old_species = species_data["species"]
 
     df_inits = pd.DataFrame(initial_abundances, columns=old_species)
     df_inits["Radfield"] = 0
@@ -437,19 +432,3 @@ def preprocess_uclchem_grav(
     print("  - Physical parameter ranges:")
     for param, info in physical_param_ranges.items():
         print(f"      {param}: [{info['min']:.6e}, {info['max']:.6e}] {info['unit']}")
-
-
-# Registry of available preprocessors
-PREPROCESSORS: Dict[str, Callable[..., None]] = {
-    "uclchem_grav": preprocess_uclchem_grav,
-}
-
-
-def get_preprocessor(dataset_name: str) -> Callable[..., None] | None:
-    """Get preprocessor function for a dataset."""
-    return PREPROCESSORS.get(dataset_name)
-
-
-def list_available_datasets() -> list[str]:
-    """List all available datasets for preprocessing."""
-    return list(PREPROCESSORS.keys())

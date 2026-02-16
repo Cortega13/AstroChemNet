@@ -20,78 +20,57 @@ def main(
     ae_config: AEConfig,
     em_config: EMConfig,
 ) -> None:
-    """Train emulator model with given configuration."""
-    print(general_config.device)
-    processing_functions = dp.Processing(
-        general_config,
-        ae_config,
+    """Train emulator model with given configuration.
+
+    Note: Run 'python run.py preprocess emulator' before training to prepare
+    the training and validation datasets.
+    """
+    # Load preprocessed datasets (must run preprocessing first)
+    training_dataset, training_indices = dl.load_tensors_from_hdf5(
+        general_config, category="training_seq"
     )
+    validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
+        general_config, category="validation_seq"
+    )
+
+    training_Dataset = dl.EmulatorSequenceDataset(
+        general_config, ae_config, training_dataset, training_indices
+    )
+    validation_Dataset = dl.EmulatorSequenceDataset(
+        general_config, ae_config, validation_dataset, validation_indices
+    )
+    del training_dataset, validation_dataset, training_indices, validation_indices
+
+    training_dataloader = dl.tensor_to_dataloader(em_config, training_Dataset)
+    validation_dataloader = dl.tensor_to_dataloader(em_config, validation_Dataset)
+
+    emulator = load_emulator(Emulator, general_config, em_config)
+    optimizer, scheduler = load_objects(emulator, em_config)
+
+    processing_functions = dp.Processing(general_config, ae_config)
     autoencoder = load_autoencoder(
         Autoencoder, general_config, ae_config, inference=True
     )
-    inference_functions = Inference(general_config, processing_functions, autoencoder)
 
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
-    training_dataset = dp.preprocessing_emulator_dataset(
-        general_config,
-        em_config,
-        training_np,
+    loss_functions = Loss(
         processing_functions,
-        inference_functions,
-    )
-    validation_dataset = dp.preprocessing_emulator_dataset(
         general_config,
+        ModelConfig=em_config,
+    )
+    emulator_trainer = EmulatorTrainerSequential(
+        general_config,
+        ae_config,
         em_config,
-        validation_np,
+        loss_functions,
         processing_functions,
-        inference_functions,
+        autoencoder,
+        emulator,
+        optimizer,
+        scheduler,
+        training_dataloader,
+        validation_dataloader,
     )
-
-    dl.save_tensors_to_hdf5(general_config, training_dataset, category="training_seq")
-    dl.save_tensors_to_hdf5(
-        general_config, validation_dataset, category="validation_seq"
-    )
-
-    # training_dataset, training_indices = dl.load_tensors_from_hdf5(
-    #     general_config, category="training_seq"
-    # )
-    # validation_dataset, validation_indices = dl.load_tensors_from_hdf5(
-    #     general_config, category="validation_seq"
-    # )
-
-    # training_Dataset = dl.EmulatorSequenceDataset(
-    #     general_config, ae_config, training_dataset, training_indices
-    # )
-    # validation_Dataset = dl.EmulatorSequenceDataset(
-    #     general_config, ae_config, validation_dataset, validation_indices
-    # )
-    # del training_dataset, validation_dataset, training_indices, validation_indices
-
-    # training_dataloader = dl.tensor_to_dataloader(em_config, training_Dataset)
-    # validation_dataloader = dl.tensor_to_dataloader(em_config, validation_Dataset)
-
-    # emulator = load_emulator(Emulator, general_config, em_config)
-    # optimizer, scheduler = load_objects(emulator, em_config)
-
-    # loss_functions = Loss(
-    #     processing_functions,
-    #     general_config,
-    #     ModelConfig=em_config,
-    # )
-    # emulator_trainer = EmulatorTrainerSequential(
-    #     general_config,
-    #     ae_config,
-    #     em_config,
-    #     loss_functions,
-    #     processing_functions,
-    #     autoencoder,
-    #     emulator,
-    #     optimizer,
-    #     scheduler,
-    #     training_dataloader,
-    #     validation_dataloader,
-    # )
-    # emulator_trainer.train()
+    emulator_trainer.train()
 
 
 if __name__ == "__main__":

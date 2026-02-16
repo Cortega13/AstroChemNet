@@ -7,7 +7,11 @@ from src.models.autoencoder import Autoencoder
 from src.models.emulator import Emulator
 
 from . import benchmark
-from .preprocessing.uclchem_grav_preprocessing import get_preprocessor
+from .preprocessing import (
+    get_preprocessor,
+    list_available_datasets,
+    preprocess_emulator,
+)
 from .training.train_autoencoder import main as train_autoencoder
 from .training.train_emulator import main as train_emulator
 
@@ -37,9 +41,20 @@ def handle_preprocess(dataset: str, force: bool = False) -> None:
     """Handle preprocess command for dataset preparation.
 
     Args:
-        dataset: Dataset name to preprocess
+        dataset: Dataset name to preprocess ('uclchem_grav' or 'emulator')
         force: If True, overwrite existing preprocessing output
     """
+    # Special handling for emulator preprocessing
+    if dataset == "emulator":
+        general_config = GeneralConfig(dataset_name="uclchem_grav")
+        ae_config = AEConfig(general_config=general_config)
+        em_config = EMConfig(general_config=general_config, ae_config=ae_config)
+        print("Preprocessing emulator dataset...")
+        preprocess_emulator(general_config, ae_config, em_config, Autoencoder)
+        print("Emulator preprocessing complete.")
+        return
+
+    # Standard dataset preprocessing
     preprocessor = get_preprocessor(dataset)
     if preprocessor:
         print(f"Preprocessing dataset: {dataset}")
@@ -47,7 +62,7 @@ def handle_preprocess(dataset: str, force: bool = False) -> None:
         print(f"Preprocessing complete for: {dataset}")
     else:
         print(f"Unknown dataset: {dataset}")
-        print("Available datasets: uclchem_grav")
+        print(f"Available datasets: {', '.join(list_available_datasets())}")
 
 
 def handle_benchmark(model: str, dataset_name: str = "uclchem_grav") -> None:

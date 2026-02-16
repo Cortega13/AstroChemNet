@@ -19,39 +19,39 @@ def load_datasets(
     columns: List[str],
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Load training and validation datasets from HDF5 files as numpy arrays."""
-    training_dataset = pd.read_hdf(
+    training_np = pd.read_hdf(
         GeneralConfig.dataset_path,
         "train",
         start=0,
-        # stop=5000,
-        # stop=1500000
-    ).astype(np.float32)
-    validation_dataset = pd.read_hdf(
+        stop=5000,
+        # stop=1500000,
+        columns=columns,
+    ).to_numpy(dtype=np.float32)
+    validation_np = pd.read_hdf(
         GeneralConfig.dataset_path,
         "val",
         start=0,
-        # stop=5000,
+        stop=5000,
         # stop=1500000
-    ).astype(np.float32)
+        columns=columns,
+    ).to_numpy(dtype=np.float32)
 
-    training_np = training_dataset[columns].to_numpy(copy=False)
-    validation_np = validation_dataset[columns].to_numpy(copy=False)
+    species_slice = slice(-GeneralConfig.num_species, None)
 
     np.clip(
-        training_np[:, -GeneralConfig.num_species :],
+        training_np[:, species_slice],
         GeneralConfig.abundances_lower_clipping,
         GeneralConfig.abundances_upper_clipping,
-        out=training_np[:, -GeneralConfig.num_species :],
+        out=training_np[:, species_slice],
     )
 
     np.clip(
-        validation_np[:, -GeneralConfig.num_species :],
+        validation_np[:, species_slice],
         GeneralConfig.abundances_lower_clipping,
         GeneralConfig.abundances_upper_clipping,
-        out=validation_np[:, -GeneralConfig.num_species :],
+        out=validation_np[:, species_slice],
     )
 
-    del training_dataset, validation_dataset
     gc.collect()
     return training_np, validation_np
 

@@ -1,5 +1,6 @@
 """Training script for autoencoder model."""
 
+import numpy as np
 import torch
 
 from src.configs.autoencoder import AEConfig
@@ -13,13 +14,33 @@ from ..models.autoencoder import Autoencoder, load_autoencoder
 from ..trainer import AutoencoderTrainer, load_objects
 
 
+def save_latents_minmax(
+    general_config: GeneralConfig,
+    dataset_t: torch.Tensor,
+    inference_functions: Inference,
+) -> None:
+    """Compute and save min/max values of latent components for scaling."""
+    min_, max_ = float("inf"), float("-inf")
+
+    with torch.no_grad():
+        for i in range(0, len(dataset_t), AEConfig.batch_size):
+            batch = dataset_t[i : i + AEConfig.batch_size].to(general_config.device)
+            encoded = inference_functions.encode(batch).cpu()
+            min_ = min(min_, encoded.min().item())
+            max_ = max(max_, encoded.max().item())
+
+    minmax_np = np.array([min_, max_], dtype=np.float32)
+    print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
+    np.save(AEConfig.latents_minmax_path, minmax_np)
+
+
 def main(
     Autoencoder: type[Autoencoder],
     general_config: GeneralConfig,
     ae_config: AEConfig,
 ) -> None:
     """Train autoencoder model with given configuration."""
-    processing_functions = dp.Processing(general_config, ae_config)
+    processing_functions = dp.Processing(general_config)
 
     training_np, validation_np = dl.load_datasets(general_config, ae_config.columns)
 
@@ -57,9 +78,7 @@ def main(
 
     total_dataset = torch.vstack((training_dataset, validation_dataset))
     inference_functions = Inference(general_config, processing_functions, autoencoder)
-    processing_functions.save_latents_minmax(
-        ae_config, total_dataset, inference_functions
-    )
+    save_latents_minmax(general_config, total_dataset, inference_functions)
 
 
 if __name__ == "__main__":

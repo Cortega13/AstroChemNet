@@ -7,6 +7,7 @@ import torch
 from src.configs.autoencoder import AEConfig
 from src.configs.emulator import EMConfig
 from src.configs.general import GeneralConfig
+from src.data_processing import Processing
 
 
 class Loss:
@@ -14,7 +15,7 @@ class Loss:
 
     def __init__(
         self,
-        processing_functions,
+        processing_functions: Processing,
         GeneralConfig: GeneralConfig,
         ModelConfig: Optional[AEConfig | EMConfig] = None,
     ) -> None:
@@ -62,6 +63,8 @@ class Loss:
         """Calculate loss between elemental abundances of actual and predicted."""
         unscaled_tensor1 = self.inverse_abundances_scaling(tensor1)
         unscaled_tensor2 = self.inverse_abundances_scaling(tensor2)
+        if not (unscaled_tensor1 and unscaled_tensor2):
+            raise Exception()
 
         elemental_abundances1 = torch.abs(
             torch.matmul(unscaled_tensor1, self.stoichiometric_matrix)
