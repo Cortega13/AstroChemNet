@@ -18,26 +18,26 @@ class Processing:
     """Group of preprocessing and postprocessing functions for data scaling."""
 
     def __init__(
-        self, GeneralConfig: GeneralConfig, AEConfig: Optional[AEConfig] = None
+        self, general_config: GeneralConfig, ae_config: Optional[AEConfig] = None
     ) -> None:
-        self.device = GeneralConfig.device
+        self.device = general_config.device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
 
         self.abundances_min = torch.tensor(
-            np.log10(GeneralConfig.abundances_lower_clipping),
+            np.log10(general_config.abundances_lower_clipping),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_max = torch.tensor(
-            np.log10(GeneralConfig.abundances_upper_clipping),
+            np.log10(general_config.abundances_upper_clipping),
             dtype=torch.float32,
             device=self.device,
         )
         self.abundances_min_np = self.abundances_min.cpu().numpy()
         self.abundances_max_np = self.abundances_max.cpu().numpy()
 
-        if AEConfig is not None:
-            latents_minmax = np.load(AEConfig.latents_minmax_path)
+        if ae_config is not None:
+            latents_minmax = np.load(ae_config.latents_minmax_path)
             print(f"Latents MinMax: {latents_minmax[0]}, {latents_minmax[1]}")
             self.components_min = torch.tensor(
                 latents_minmax[0], dtype=torch.float32, device=self.device
@@ -46,9 +46,9 @@ class Processing:
                 latents_minmax[1], dtype=torch.float32, device=self.device
             )
 
-        self.physical_parameter_ranges = GeneralConfig.physical_parameter_ranges
-        self.species = GeneralConfig.species
-        self.num_species = GeneralConfig.num_species
+        self.physical_parameter_ranges = general_config.physical_parameter_ranges
+        self.species = general_config.species
+        self.num_species = general_config.num_species
 
     ### PreProcessing Functions
 
@@ -181,16 +181,16 @@ def calculate_emulator_indices(
 
 
 def preprocessing_emulator_dataset(
-    GeneralConfig: GeneralConfig,
-    EMConfig: EMConfig,
+    general_config: GeneralConfig,
+    em_config: EMConfig,
     dataset_np: np.ndarray,
     processing_functions: Processing,
     inference_functions: Inference,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Preprocess dataset for emulator training with indices and latent components."""
-    num_species = GeneralConfig.num_species
-    num_phys = GeneralConfig.num_phys
-    num_metadata = GeneralConfig.num_metadata
+    num_species = general_config.num_species
+    num_phys = general_config.num_phys
+    num_metadata = general_config.num_metadata
 
     dataset_np[:, 0] = np.arange(len(dataset_np))
 
@@ -208,7 +208,7 @@ def preprocessing_emulator_dataset(
     encoded_dataset_np = np.hstack((dataset_np, latent_components), dtype=np.float32)
 
     index_pairs_np = calculate_emulator_indices(
-        encoded_dataset_np, EMConfig.window_size
+        encoded_dataset_np, em_config.window_size
     )
 
     perm = np.random.permutation(len(index_pairs_np))

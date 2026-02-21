@@ -15,13 +15,13 @@ class Inference:
 
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
+        general_config: GeneralConfig,
         processing_functions,
         autoencoder: Optional[Autoencoder] = None,
         emulator: Optional[Emulator] = None,
     ) -> None:
         """Initialize Inference with config, processing functions, and models."""
-        self.device = GeneralConfig.device
+        self.device = general_config.device
         self.autoencoder = autoencoder
         self.emulator = emulator
 

@@ -16,13 +16,13 @@ class Loss:
     def __init__(
         self,
         processing_functions: Processing,
-        GeneralConfig: GeneralConfig,
+        general_config: GeneralConfig,
         ModelConfig: Optional[AEConfig | EMConfig] = None,
     ) -> None:
         """Initialize Loss with processing functions and configuration."""
-        device = GeneralConfig.device
+        device = general_config.device
         self.stoichiometric_matrix = torch.tensor(
-            GeneralConfig.stoichiometric_matrix, dtype=torch.float32, device=device
+            general_config.stoichiometric_matrix, dtype=torch.float32, device=device
         )
         self.exponential = torch.log(torch.tensor(10, device=device).float())
 
@@ -63,8 +63,6 @@ class Loss:
         """Calculate loss between elemental abundances of actual and predicted."""
         unscaled_tensor1 = self.inverse_abundances_scaling(tensor1)
         unscaled_tensor2 = self.inverse_abundances_scaling(tensor2)
-        if not (unscaled_tensor1 and unscaled_tensor2):
-            raise Exception()
 
         elemental_abundances1 = torch.abs(
             torch.matmul(unscaled_tensor1, self.stoichiometric_matrix)

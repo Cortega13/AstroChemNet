@@ -16,7 +16,7 @@ class Autoencoder(nn.Module):
 
     def __init__(
         self,
-        input_dim: int = 333,
+        input_dim: int,
         latent_dim: int = 12,
         hidden_dims: Tuple[int, ...] = (320, 160),
         noise: float = 0.1,
@@ -77,22 +77,24 @@ class Autoencoder(nn.Module):
 
 def load_autoencoder(
     autoencoder_class: type[Autoencoder],
-    GeneralConfig: GeneralConfig,
-    AEConfig: AEConfig,
+    general_config: GeneralConfig,
+    ae_config: AEConfig,
     inference: bool = False,
 ) -> Autoencoder:
     """Load autoencoder model with optional pretrained weights."""
     autoencoder = autoencoder_class(
-        input_dim=AEConfig.input_dim,
-        latent_dim=AEConfig.latent_dim,
-        hidden_dims=AEConfig.hidden_dims,
-        noise=AEConfig.noise,
-        dropout=AEConfig.dropout,
-    ).to(GeneralConfig.device)
-    if os.path.exists(AEConfig.pretrained_model_path):
+        input_dim=ae_config.input_dim,
+        latent_dim=ae_config.latent_dim,
+        hidden_dims=ae_config.hidden_dims,
+        noise=ae_config.noise,
+        dropout=ae_config.dropout,
+    ).to(general_config.device)
+    if os.path.exists(ae_config.pretrained_model_path):
         print("Loading Pretrained Model")
         autoencoder.load_state_dict(
-            torch.load(AEConfig.pretrained_model_path, map_location=torch.device("cpu"))
+            torch.load(
+                ae_config.pretrained_model_path, map_location=torch.device("cpu")
+            )
         )
 
     if inference:

@@ -1,16 +1,12 @@
 """Preprocessing script for UCLCHEM gravitational collapse dataset."""
 
-import gc
 import json
 import math
 import os
 from datetime import datetime, timezone
 
 import numpy as np
-import pandas as pd
 import torch
-
-from .. import utils
 
 
 def round_down_sigfigs(value: float, sig_figs: int = 2) -> float:
@@ -140,41 +136,6 @@ def save_stoichiometric_matrix(
     return stoichiometric_matrix_t
 
 
-def save_physical_parameter_ranges(
-    output_dir: str,
-    df: pd.DataFrame,
-    physical_params: list[str],
-) -> dict[str, dict[str, float | str]]:
-    """Compute and save min/max values for physical parameters to JSON."""
-    units = {
-        "Density": "H nuclei per cm^3",
-        "Radfield": "Habing field",
-        "Av": "Magnitudes",
-        "gasTemp": "Kelvin",
-    }
-
-    ranges = {}
-    for param in physical_params:
-        ranges[param] = {
-            "min": float(df[param].min()),
-            "max": float(df[param].max()),
-            "unit": units.get(param, "unknown"),
-        }
-
-    with open(os.path.join(output_dir, "physical_parameter_ranges.json"), "w") as f:
-        json.dump(ranges, f, indent=2)
-
-    return ranges
-
-
-def save_initial_abundances(
-    output_dir: str,
-    initial_abundances: np.ndarray,
-) -> None:
-    """Save initial abundances to NPY."""
-    np.save(os.path.join(output_dir, "initial_abundances.npy"), initial_abundances)
-
-
 def save_train_val_split(
     output_dir: str,
     train_models: list[int],
@@ -197,11 +158,12 @@ def preprocess_uclchem_grav(
 ) -> None:
     """Preprocess UCLCHEM gravitational collapse dataset.
 
-    Reads raw data from data/uclchem_grav.h5 and writes:
-    - Cleaned training and validation sets to data/uclchem_grav_clean.h5
-    - Preprocessing artifacts to outputs/preprocessed/<dataset_name>/
-
-    Memory-optimized: processes data in chunks and writes incrementally.
+    Loads preprocessed data from data/uclchem_grav.npy and performs:
+    - Train/validation split
+    - Saves train and val datasets as .npy files
+    - Computes and saves stoichiometric matrix
+    - Computes and saves metadata
+    - Computes and saves physical parameter ranges
 
     Args:
         dataset_name: Name for the output directory
@@ -222,213 +184,114 @@ def preprocess_uclchem_grav(
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load initial abundances from old location
-    initial_abundances = np.load(os.path.join(output_dir, "initial_abundances.npy"))
+    # Load the preprocessed .npy file
+    source_file = "data/uclchem_grav.npy"
+    print(f"Loading preprocessed data from {source_file}...")
+    data_array = np.load(os.path.join(project_root, source_file))
+    print(f"Loaded array with shape {data_array.shape}")
 
-    # Load species list for initial abundances
-    with open(os.path.join(output_dir, "species.json"), "r") as f:
-        species_data = json.load(f)
-    old_species = species_data["species"]
+    # Load column mapping
+    columns_path = "data/uclchem_grav_columns.json"
+    with open(os.path.join(project_root, columns_path), "r") as f:
+        columns_mapping = json.load(f)
 
-    df_inits = pd.DataFrame(initial_abundances, columns=old_species)
-    df_inits["Radfield"] = 0
-    df_inits["Time"] = 0
-    df_inits["Av"] = 0
-    df_inits["gasTemp"] = 0
-    df_inits["Density"] = 0
+    # Convert to list of column names in order
+    num_cols = data_array.shape[1]
+    columns = [columns_mapping[str(i)] for i in range(num_cols)]
+    print(f"Columns: {columns[:10]}... (showing first 10)")
 
-    # Load raw data
-    source_file = "data/uclchem_grav.h5"
-    print(f"Loading raw data from {source_file}...")
-    df = pd.read_hdf(os.path.join(project_root, source_file), key="df", start=0)
-    if not isinstance(df, pd.DataFrame):
-        raise ValueError("Input dataset is not a dataframe.")
+    # Define column indices
+    model_col_idx = columns.index("Model")
 
-    print(f"Loaded {len(df)} rows")
-
-    # Drop unused columns
-    df = df.drop(columns=["dustTemp", "dstep", "zeta", "SURFACE", "BULK"])
-    df.columns = utils.rename_columns(list(df.columns))
-
-    # Define metadata and physical parameter columns
-    metadata_cols_no_index = ["Model", "Time"]  # Index added separately
+    # Physical parameters
     phys_cols = ["Density", "Radfield", "Av", "gasTemp"]
+    phys_col_indices = [columns.index(p) for p in phys_cols]
 
-    # Extract species columns (exclude Index, Model, Time, and phys cols)
-    species = [
-        col for col in df.columns if col not in ["Index", "Model", "Time"] + phys_cols
-    ]
-    species = sorted(species)
+    # Species columns (everything after metadata and physical params)
+    metadata_cols = ["Index", "Model", "Time"]
+    species = [col for col in columns if col not in metadata_cols + phys_cols]
+    print(f"Found {len(species)} species columns")
 
-    print("Sorting data by Model and Time...")
-    df.sort_values(by=["Model", "Time"], inplace=True)
-
-    # Clamp Radfield to minimum value
-    df["Radfield"] = np.maximum(df["Radfield"], 1e-4)
-
-    params = phys_cols
-
-    # Get unique models for splitting BEFORE processing
+    # Get unique models for train/val split
     print("Getting unique models for train/val split...")
-    all_models = df["Model"].unique()
+    model_col = data_array[:, model_col_idx]
+    all_models = np.unique(model_col)
     np.random.shuffle(all_models)
 
     split_ratio = 0.75
     split_idx = int(len(all_models) * split_ratio)
-    train_models_set = set(all_models[:split_idx])
-    val_models_set = set(all_models[split_idx:])
+    train_models = all_models[:split_idx]
+    val_models = all_models[split_idx:]
+    train_models_set = set(train_models.tolist())
+    val_models_set = set(val_models.tolist())
 
-    # Process data in chunks by model to save memory
-    print("Processing models...")
-    output_path = os.path.join(project_root, "data/uclchem_grav_clean.h5")
+    print(f"Train models: {len(train_models)}, Val models: {len(val_models)}")
 
-    # Initialize physical parameter ranges tracking
-    phys_ranges = {p: {"min": float("inf"), "max": float("-inf")} for p in params}
+    # Split data into train and validation sets
+    print("Splitting data into train and validation sets...")
+    train_mask = np.isin(model_col, list(train_models_set))
+    val_mask = np.isin(model_col, list(val_models_set))
 
-    train_rows = 0
-    val_rows = 0
-    first_write = True
-    global_index = 0  # Track global index across all chunks
+    train_data = data_array[train_mask]
+    val_data = data_array[val_mask]
 
-    # Batch accumulation for efficient writes
-    batch_size = 500
-    train_batch: list[pd.DataFrame] = []
-    val_batch: list[pd.DataFrame] = []
+    print(f"Train samples: {len(train_data)}, Val samples: {len(val_data)}")
 
-    # Group by model and process
-    for i, (tracer, tdf) in enumerate(df.groupby("Model", sort=False)):
-        if i % 500 == 0:
-            print(f"  Processing model {i}...")
-
-        tdf = tdf.reset_index(drop=True)
-
-        df_inits["Model"] = tdf.iloc[0]["Model"]
-
-        tdf = pd.concat([df_inits, tdf], ignore_index=True)
-
-        physical = tdf[params].shift(-1)
-        physical.iloc[-1] = physical.iloc[-2]
-
-        tdf[params] = physical
-
-        # Update physical parameter ranges
-        for p in params:
-            phys_ranges[p]["min"] = min(phys_ranges[p]["min"], float(tdf[p].min()))
-            phys_ranges[p]["max"] = max(phys_ranges[p]["max"], float(tdf[p].max()))
-
-        # Determine if train or val
-        is_train = tracer in train_models_set
-
-        # Select columns in correct order (without Index - added below)
-        tdf = tdf[metadata_cols_no_index + params + species]
-
-        # Assign global index and defragment
-        chunk_len = len(tdf)
-        index_col = pd.Series(
-            range(global_index, global_index + chunk_len), name="Index"
-        )
-        tdf = pd.concat([index_col, tdf], axis=1).copy()  # .copy() defragments
-        global_index += chunk_len
-
-        if is_train:
-            train_rows += chunk_len
-            train_batch.append(tdf)
-        else:
-            val_rows += chunk_len
-            val_batch.append(tdf)
-
-        # Write batches when they reach batch_size
-        if len(train_batch) >= batch_size:
-            batch_df = pd.concat(train_batch, ignore_index=True)
-            if first_write:
-                batch_df.to_hdf(output_path, key="train", mode="w", append=True)
-                first_write = False
-            else:
-                batch_df.to_hdf(output_path, key="train", mode="a", append=True)
-            train_batch.clear()
-            gc.collect()
-
-        if len(val_batch) >= batch_size:
-            batch_df = pd.concat(val_batch, ignore_index=True)
-            if first_write:
-                batch_df.to_hdf(output_path, key="val", mode="w", append=True)
-                first_write = False
-            else:
-                batch_df.to_hdf(output_path, key="val", mode="a", append=True)
-            val_batch.clear()
-            gc.collect()
-
-        # Clean up
-        del tdf, physical
-
-    # Write remaining batches
-    if train_batch:
-        batch_df = pd.concat(train_batch, ignore_index=True)
-        if first_write:
-            batch_df.to_hdf(output_path, key="train", mode="w", append=True)
-            first_write = False
-        else:
-            batch_df.to_hdf(output_path, key="train", mode="a", append=True)
-        train_batch.clear()
-
-    if val_batch:
-        batch_df = pd.concat(val_batch, ignore_index=True)
-        if first_write:
-            batch_df.to_hdf(output_path, key="val", mode="w", append=True)
-        else:
-            batch_df.to_hdf(output_path, key="val", mode="a", append=True)
-        val_batch.clear()
-
-    # Clean up original dataframe
-    del df
-    gc.collect()
-
-    print(f"Train rows: {train_rows}, Val rows: {val_rows}")
-
-    # Save physical parameter ranges (with rounded min/max for breathing room)
+    # Compute physical parameter ranges from training data
+    print("Computing physical parameter ranges...")
+    phys_ranges = {}
     units = {
         "Density": "H nuclei per cm^3",
         "Radfield": "Habing field",
         "Av": "Magnitudes",
         "gasTemp": "Kelvin",
     }
-    physical_param_ranges = {}
-    for p in params:
-        physical_param_ranges[p] = {
-            "min": round_down_sigfigs(phys_ranges[p]["min"]),
-            "max": round_up_sigfigs(phys_ranges[p]["max"]),
+    for p, idx in zip(phys_cols, phys_col_indices):
+        col_min = float(train_data[:, idx].min())
+        col_max = float(train_data[:, idx].max())
+        phys_ranges[p] = {
+            "min": round_down_sigfigs(col_min),
+            "max": round_up_sigfigs(col_max),
             "unit": units.get(p, "unknown"),
         }
+
     with open(os.path.join(output_dir, "physical_parameter_ranges.json"), "w") as f:
-        json.dump(physical_param_ranges, f, indent=2)
+        json.dump(phys_ranges, f, indent=2)
+
+    # Save train and validation datasets as .npy files
+    print("Saving train and validation datasets...")
+    np.save(os.path.join(output_dir, "train.npy"), train_data)
+    np.save(os.path.join(output_dir, "val.npy"), val_data)
 
     # Save preprocessing artifacts
     save_species(output_dir, species)
     save_stoichiometric_matrix(output_dir, species)
-    save_initial_abundances(output_dir, initial_abundances)
-    # Convert numpy int64 to Python int for JSON serialization
+
+    # Save train/val split info
     save_train_val_split(
         output_dir,
-        [int(m) for m in train_models_set],
-        [int(m) for m in val_models_set],
+        [int(m) for m in train_models],
+        [int(m) for m in val_models],
         seed=seed,
     )
+
+    # Save metadata
     save_metadata(
         output_dir,
         dataset_name,
         source_file,
         num_species=len(species),
-        num_physical_params=len(params),
-        num_train_samples=train_rows,
-        num_val_samples=val_rows,
+        num_physical_params=len(phys_cols),
+        num_train_samples=len(train_data),
+        num_val_samples=len(val_data),
         train_val_split_ratio=split_ratio,
     )
 
     print(f"Preprocessing complete. Output saved to {output_dir}")
     print(f"  - Species: {len(species)}")
-    print(f"  - Physical parameters: {len(params)}")
-    print(f"  - Training samples: {train_rows}")
-    print(f"  - Validation samples: {val_rows}")
+    print(f"  - Physical parameters: {len(phys_cols)}")
+    print(f"  - Training samples: {len(train_data)}")
+    print(f"  - Validation samples: {len(val_data)}")
     print("  - Physical parameter ranges:")
-    for param, info in physical_param_ranges.items():
+    for param, info in phys_ranges.items():
         print(f"      {param}: [{info['min']:.6e}, {info['max']:.6e}] {info['unit']}")

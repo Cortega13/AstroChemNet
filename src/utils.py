@@ -2,9 +2,6 @@
 
 from typing import List
 
-import numpy as np
-import torch
-
 
 def rename_columns(columns: List[str]) -> List[str]:
     """Rename column names containing chemical species using substring replacement."""
@@ -46,28 +43,3 @@ def rename_columns(columns: List[str]) -> List[str]:
         new_columns.append(new_col)
 
     return new_columns
-
-
-def convertUCLCHEMbaseAvtoAv(physical_parameters: np.ndarray) -> None:
-    """Convert baseAv to Av using UCLCHEM internal conversion formula."""
-    baseAv_idx = 2
-    density_idx = 0
-    multiplier = 0.0000964375
-    additive = np.multiply(multiplier, physical_parameters[:, density_idx])
-    np.add(
-        physical_parameters[:, baseAv_idx],
-        additive,
-        out=physical_parameters[:, baseAv_idx],
-    )
-
-
-def reconstruct_emulated_outputs(
-    encoded_inputs: torch.Tensor,
-    emulated_outputs: torch.Tensor,
-    num_physical_parameters: int,
-) -> torch.Tensor:
-    """Add time and physical parameter columns to the latent components."""
-    reconstructed_emulated_outputs = torch.cat(
-        (encoded_inputs[:, : 1 + num_physical_parameters], emulated_outputs), dim=1
-    )
-    return reconstructed_emulated_outputs

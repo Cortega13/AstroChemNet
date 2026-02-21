@@ -36,7 +36,7 @@ Examples:
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=["uclchem_grav"],
+        choices=["uclchem_grav", "emulator"],
         help="Dataset to preprocess",
     )
     preprocess_parser.add_argument(

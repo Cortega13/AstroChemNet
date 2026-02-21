@@ -36,7 +36,7 @@ class Trainer:
 
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
+        general_config: GeneralConfig,
         model_config: AEConfig | EMConfig,
         model: Autoencoder | Emulator,
         optimizer: torch.optim.Optimizer,
@@ -45,7 +45,7 @@ class Trainer:
         validation_dataloader: DataLoader,
     ) -> None:
         """Initialize the Trainer with model, optimizer, and data loaders."""
-        self.device = GeneralConfig.device
+        self.device = general_config.device
         self.start_time = datetime.now()
         self.model_config = model_config
 
@@ -60,7 +60,7 @@ class Trainer:
         self.current_learning_rate = self.model_config.lr
         self.best_weights = None
         self.metric_minimum_loss = np.inf
-        self.epoch_validation_loss = torch.zeros(GeneralConfig.num_species).to(
+        self.epoch_validation_loss = torch.zeros(general_config.num_species).to(
             self.device
         )
         self.stagnant_epochs = 0
@@ -200,8 +200,8 @@ class AutoencoderTrainer(Trainer):
 
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
-        AEConfig: AEConfig,
+        general_config: GeneralConfig,
+        ae_config: AEConfig,
         loss_functions: Loss,
         autoencoder: Autoencoder,
         optimizer: torch.optim.Optimizer,
@@ -210,19 +210,19 @@ class AutoencoderTrainer(Trainer):
         validation_dataloader: DataLoader,
     ) -> None:
         """Initialize AutoencoderTrainer with model config, loss functions, and data loaders."""
-        self.num_metadata = GeneralConfig.num_metadata
-        self.num_phys = GeneralConfig.phys
-        self.num_species = GeneralConfig.num_species
-        self.num_components = AEConfig.latent_dim
-        self.gradient_clipping = AEConfig.gradient_clipping
+        self.num_metadata = general_config.num_metadata
+        self.num_phys = general_config.num_phys
+        self.num_species = general_config.num_species
+        self.num_components = ae_config.latent_dim
+        self.gradient_clipping = ae_config.gradient_clipping
 
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
 
         super().__init__(
-            GeneralConfig,
-            model_config=AEConfig,
+            general_config,
+            model_config=ae_config,
             model=autoencoder,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -278,9 +278,9 @@ class EmulatorTrainerSequential(Trainer):
 
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
-        AEConfig: AEConfig,
-        EMConfig: EMConfig,
+        general_config: GeneralConfig,
+        ae_config: AEConfig,
+        em_config: EMConfig,
         loss_functions: Loss,
         processing_functions: dp.Processing,
         autoencoder: Autoencoder,
@@ -294,15 +294,16 @@ class EmulatorTrainerSequential(Trainer):
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
-        self.latent_dim = AEConfig.latent_dim
-        self.gradient_clipping = EMConfig.gradient_clipping
+        self.latent_dim = ae_config.latent_dim
+        self.num_species = general_config.num_species
+        self.gradient_clipping = em_config.gradient_clipping
         self.inverse_latent_components_scaling = (
             processing_functions.inverse_latent_components_scaling
         )
 
         super().__init__(
-            GeneralConfig,
-            model_config=EMConfig,
+            general_config,
+            model_config=em_config,
             model=emulator,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -321,7 +322,7 @@ class EmulatorTrainerSequential(Trainer):
         outputs = outputs.reshape(-1, self.latent_dim)
         outputs = self.inverse_latent_components_scaling(outputs)
         outputs = self.ae.decode(outputs)
-        targets = targets.reshape(-1, 333)
+        targets = targets.reshape(-1, self.num_species)
 
         loss = self.training_loss(outputs, targets)
         loss.backward()

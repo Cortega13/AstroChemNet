@@ -53,20 +53,22 @@ class Emulator(nn.Module):
 
 def load_emulator(
     emulator_class: type[Emulator],
-    GeneralConfig: GeneralConfig,
-    EMConfig: EMConfig,
+    general_config: GeneralConfig,
+    em_config: EMConfig,
     inference: bool = False,
 ) -> Emulator:
     """Load emulator model with optional pretrained weights."""
     emulator = emulator_class(
-        input_dim=EMConfig.input_dim,
-        output_dim=EMConfig.output_dim,
-        hidden_dim=EMConfig.hidden_dim,
-    ).to(GeneralConfig.device)
-    if os.path.exists(EMConfig.pretrained_model_path):
+        input_dim=em_config.input_dim,
+        output_dim=em_config.output_dim,
+        hidden_dim=em_config.hidden_dim,
+    ).to(general_config.device)
+    if os.path.exists(em_config.pretrained_model_path):
         print("Loading Pretrained Model")
         emulator.load_state_dict(
-            torch.load(EMConfig.pretrained_model_path, map_location=torch.device("cpu"))
+            torch.load(
+                em_config.pretrained_model_path, map_location=torch.device("cpu")
+            )
         )
     if inference:
         print("Setting Emulator to Inference Mode")

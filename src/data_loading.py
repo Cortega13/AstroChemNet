@@ -1,12 +1,12 @@
 """Data loading methods for loading datasets onto CPU memory and batching for training."""
 
 import gc
+import json
 import os
 from typing import List, Tuple
 
 import h5py
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
@@ -15,40 +15,49 @@ from src.configs.general import GeneralConfig
 
 
 def load_datasets(
-    GeneralConfig: GeneralConfig,
+    general_config: GeneralConfig,
     columns: List[str],
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Load training and validation datasets from HDF5 files as numpy arrays."""
-    training_np = pd.read_hdf(
-        GeneralConfig.dataset_path,
-        "train",
-        start=0,
-        stop=5000,
-        # stop=1500000,
-        columns=columns,
-    ).to_numpy(dtype=np.float32)
-    validation_np = pd.read_hdf(
-        GeneralConfig.dataset_path,
-        "val",
-        start=0,
-        stop=5000,
-        # stop=1500000
-        columns=columns,
-    ).to_numpy(dtype=np.float32)
+    """Load training and validation datasets from .npy files as numpy arrays.
 
-    species_slice = slice(-GeneralConfig.num_species, None)
+    Args:
+        general_config: Configuration containing dataset paths and settings
+        columns: List of column names to select from the dataset
+
+    Returns:
+        Tuple of (training_data, validation_data) as numpy arrays
+    """
+    # Load column mapping to get column indices
+    with open(general_config.columns_mapping_path, "r") as f:
+        columns_mapping = json.load(f)
+
+    # Reverse the mapping from {index: name} to {name: index}
+    columns_mapping = {name: int(idx) for idx, name in columns_mapping.items()}
+
+    # Get indices for requested columns
+    col_indices = [columns_mapping[col] for col in columns]
+
+    # Load full datasets from .npy files
+    train_full = np.load(os.path.join(general_config.dataset_path, "train.npy"))
+    val_full = np.load(os.path.join(general_config.dataset_path, "val.npy"))
+
+    # Select only requested columns
+    training_np = train_full[:, col_indices].astype(np.float32)
+    validation_np = val_full[:, col_indices].astype(np.float32)
+
+    species_slice = slice(-general_config.num_species, None)
 
     np.clip(
         training_np[:, species_slice],
-        GeneralConfig.abundances_lower_clipping,
-        GeneralConfig.abundances_upper_clipping,
+        general_config.abundances_lower_clipping,
+        general_config.abundances_upper_clipping,
         out=training_np[:, species_slice],
     )
 
     np.clip(
         validation_np[:, species_slice],
-        GeneralConfig.abundances_lower_clipping,
-        GeneralConfig.abundances_upper_clipping,
+        general_config.abundances_lower_clipping,
+        general_config.abundances_upper_clipping,
         out=validation_np[:, species_slice],
     )
 
@@ -57,23 +66,23 @@ def load_datasets(
 
 
 def save_tensors_to_hdf5(
-    GeneralConfig: GeneralConfig,
+    general_config: GeneralConfig,
     tensors: Tuple[torch.Tensor, torch.Tensor],
     category: str,
 ) -> None:
     """Save dataset and indices tensors to HDF5 file for quick loading."""
     dataset, indices = tensors
-    dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(general_config.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "w") as f:
         f.create_dataset("dataset", data=dataset.numpy(), dtype=np.float32)
         f.create_dataset("indices", data=indices.numpy(), dtype=np.int32)
 
 
 def load_tensors_from_hdf5(
-    GeneralConfig: GeneralConfig, category: str
+    general_config: GeneralConfig, category: str
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load saved dataset and indices tensors from HDF5 file."""
-    dataset_path = os.path.join(GeneralConfig.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(general_config.working_path, f"data/{category}.h5")
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]  # type:ignore
         indices = f["indices"][:]  # type:ignore
@@ -153,20 +162,20 @@ class EmulatorSequenceDataset(Dataset):
 
     def __init__(
         self,
-        GeneralConfig: GeneralConfig,
-        AEConfig: AEConfig,
+        general_config: GeneralConfig,
+        ae_config: AEConfig,
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ) -> None:
         """Initialize the emulator dataset with data matrix and indices."""
-        self.device = GeneralConfig.device
+        self.device = general_config.device
         self.data_matrix = data_matrix.contiguous()
         self.data_indices = data_indices.contiguous()
         self.num_datapoints = len(data_indices)
-        self.num_metadata = GeneralConfig.num_metadata
-        self.num_phys = GeneralConfig.num_phys
-        self.num_species = GeneralConfig.num_species
-        self.num_latents = AEConfig.latent_dim
+        self.num_metadata = general_config.num_metadata
+        self.num_phys = general_config.num_phys
+        self.num_species = general_config.num_species
+        self.num_latents = ae_config.latent_dim
 
         data_matrix_size = self.data_matrix.nbytes / (1024**2)
         indices_matrix_size = self.data_indices.nbytes / (1024**2)
@@ -209,14 +218,14 @@ def collate_function(batch):
 
 def tensor_to_dataloader(
     training_config,
-    torchDataset: Dataset,
+    torch_dataset: Dataset,
 ) -> DataLoader:
     """Create a DataLoader with chunked shuffling for the given dataset."""
-    data_size = len(torchDataset)  # type: ignore
+    data_size = len(torch_dataset)  # type: ignore
     multiplier = training_config.shuffle_chunk_size
     sampler = ChunkedShuffleSampler(data_size, chunk_size=multiplier * data_size)
     dataloader = DataLoader(
-        torchDataset,
+        torch_dataset,
         batch_size=training_config.batch_size,
         pin_memory=True,
         num_workers=10,
