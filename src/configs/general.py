@@ -53,9 +53,14 @@ class GeneralConfig:
         )
         # Dataset is now stored in the preprocessing output directory as .npy files
         self.dataset_path = self.preprocessing_dir
-        # Path to columns mapping JSON
-        self.columns_mapping_path = os.path.join(
-            self.project_root, f"data/{self.dataset_name}_columns.json"
+        # Path to columns mapping JSON (prefer mapping written by the preprocessor)
+        columns_in_output = os.path.join(self.preprocessing_dir, "columns.json")
+        self.columns_mapping_path = (
+            columns_in_output
+            if os.path.exists(columns_in_output)
+            else os.path.join(
+                self.project_root, f"data/{self.dataset_name}_columns.json"
+            )
         )
 
         # Load physical parameter ranges from JSON

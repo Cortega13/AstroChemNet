@@ -31,12 +31,18 @@ Examples:
         choices=["autoencoder", "emulator"],
         help="Model to train",
     )
+    train_parser.add_argument(
+        "--dataset",
+        default="uclchem_grav",
+        choices=["uclchem_grav", "carbox_grav"],
+        help="Dataset to use for training",
+    )
 
     # Preprocess subcommand
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=["uclchem_grav", "emulator"],
+        choices=["uclchem_grav", "carbox_grav", "emulator"],
         help="Dataset to preprocess",
     )
     preprocess_parser.add_argument(
@@ -52,6 +58,12 @@ Examples:
         choices=["autoencoder", "emulator", "combined"],
         help="Model to benchmark",
     )
+    benchmark_parser.add_argument(
+        "--dataset",
+        default="uclchem_grav",
+        choices=["uclchem_grav", "carbox_grav"],
+        help="Dataset to use for benchmarking",
+    )
 
     args = parser.parse_args()
 
@@ -59,11 +71,11 @@ Examples:
     from src.cli import handle_benchmark, handle_preprocess, handle_train
 
     if args.command == "train":
-        handle_train(args.model)
+        handle_train(args.model, dataset_name=args.dataset)
     elif args.command == "preprocess":
         handle_preprocess(args.dataset, force=args.force)
     elif args.command == "benchmark":
-        handle_benchmark(args.model)
+        handle_benchmark(args.model, dataset_name=args.dataset)
     else:
         parser.print_help()
         sys.exit(1)
