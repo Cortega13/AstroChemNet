@@ -1,5 +1,6 @@
 """Loss functions for autoencoder and emulator training."""
 
+from collections.abc import Callable
 from typing import Optional, Tuple
 
 import torch
@@ -26,7 +27,7 @@ class Loss:
         )
         self.exponential = torch.log(torch.tensor(10, device=device).float())
 
-        self.inverse_abundances_scaling = (
+        self.inverse_abundances_scaling: Callable[[torch.Tensor], torch.Tensor] = (
             processing_functions.inverse_abundances_scaling
         )
 

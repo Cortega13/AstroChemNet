@@ -1,7 +1,7 @@
 """Data processing functions for preprocessing and postprocessing data scaling."""
 
 import gc
-from typing import Optional, Tuple
+from typing import Optional, Tuple, overload
 
 import numpy as np
 import torch
@@ -117,24 +117,33 @@ class Processing:
         abundances = torch.exp(exponential_ * log_abundances)
         return abundances
 
-    def inverse_abundances_scaling(self, abundances):
+    @overload
+    def inverse_abundances_scaling(self, abundances: torch.Tensor) -> torch.Tensor: ...
+
+    @overload
+    def inverse_abundances_scaling(self, abundances: np.ndarray) -> None: ...
+
+    def inverse_abundances_scaling(
+        self, abundances: torch.Tensor | np.ndarray
+    ) -> torch.Tensor | None:
         """Reverse minmax scaling of abundances for torch or numpy arrays."""
         if isinstance(abundances, torch.Tensor):
-            abundances = self.jit_inverse_abundances_scaling(
+            return self.jit_inverse_abundances_scaling(
                 abundances,
                 self.abundances_min,
                 self.abundances_max,
                 self.exponential,
             )
-            return abundances
-        else:
-            ab_min_np = self.abundances_min.cpu().numpy()
-            ab_max_np = self.abundances_max.cpu().numpy()
-            exponential_np = self.exponential.cpu().numpy()
 
-            np.multiply(abundances, (ab_max_np - ab_min_np), out=abundances)
-            np.add(abundances, ab_min_np, out=abundances)
-            np.exp(exponential_np * abundances, out=abundances)
+        ab_min_np = self.abundances_min.cpu().numpy()
+        ab_max_np = self.abundances_max.cpu().numpy()
+        exponential_np = self.exponential.cpu().numpy()
+
+        np.multiply(abundances, (ab_max_np - ab_min_np), out=abundances)
+        np.add(abundances, ab_min_np, out=abundances)
+        np.exp(exponential_np * abundances, out=abundances)
+
+        return None
 
     @staticmethod
     @torch.jit.script

@@ -1,3 +1,16 @@
+# minor-fixes
+
+This is a rule for refactor's/minor fixes throughout the codebase.
+
+## Guidelines
+
+- I will copy snippets of code into your chat. I will provide a comment about it that I dislike.
+- You will then read this code, and read what leads to it.
+- You will then generate a .md file in the plans folder which shows a brainstorm of solutions to the problem.
+- The solutions must aim to follow minimization rules, as in try to perhaps solve upstream issues to make it more coherent throughout the codebase.
+
+
+
 1. Clarity Over Cleverness
 
 Minimal code is not code-golf.
