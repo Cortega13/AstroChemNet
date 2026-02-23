@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.configs.autoencoder import AEConfig
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 
 
 class Autoencoder(nn.Module):
@@ -77,7 +77,7 @@ class Autoencoder(nn.Module):
 
 def load_autoencoder(
     autoencoder_class: type[Autoencoder],
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
     inference: bool = False,
 ) -> Autoencoder:

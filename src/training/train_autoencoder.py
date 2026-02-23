@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from src.configs.autoencoder import AEConfig
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 
 from .. import data_loading as dl
 from .. import data_processing as dp
@@ -15,7 +15,8 @@ from ..trainer import AutoencoderTrainer, load_objects
 
 
 def save_latents_minmax(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
+    ae_config: AEConfig,
     dataset_t: torch.Tensor,
     inference_functions: Inference,
 ) -> None:
@@ -23,20 +24,20 @@ def save_latents_minmax(
     min_, max_ = float("inf"), float("-inf")
 
     with torch.no_grad():
-        for i in range(0, len(dataset_t), AEConfig.batch_size):
-            batch = dataset_t[i : i + AEConfig.batch_size].to(general_config.device)
+        for i in range(0, len(dataset_t), ae_config.batch_size):
+            batch = dataset_t[i : i + ae_config.batch_size].to(general_config.device)
             encoded = inference_functions.encode(batch).cpu()
             min_ = min(min_, encoded.min().item())
             max_ = max(max_, encoded.max().item())
 
     minmax_np = np.array([min_, max_], dtype=np.float32)
     print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
-    np.save(AEConfig.latents_minmax_path, minmax_np)
+    np.save(ae_config.latents_minmax_path, minmax_np)
 
 
 def main(
     Autoencoder: type[Autoencoder],
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
 ) -> None:
     """Train autoencoder model with given configuration."""
@@ -78,13 +79,15 @@ def main(
 
     total_dataset = torch.vstack((training_dataset, validation_dataset))
     inference_functions = Inference(general_config, processing_functions, autoencoder)
-    save_latents_minmax(general_config, total_dataset, inference_functions)
+    save_latents_minmax(general_config, ae_config, total_dataset, inference_functions)
 
 
 if __name__ == "__main__":
     # Instantiate configs - GeneralConfig loads from preprocessing output
-    general_config = GeneralConfig(dataset_name="uclchem_grav")
-    ae_config = AEConfig(general_config=general_config)
+    from src.configs.factory import build_ae_config, build_dataset_config
+
+    general_config = build_dataset_config("uclchem_grav")
+    ae_config = build_ae_config(general_config)
 
     print(f"Device: {general_config.device}")
     # Run main script.

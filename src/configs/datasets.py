@@ -1,8 +1,9 @@
-"""General runtime and dataset configuration."""
+"""Dataset-scoped runtime + preprocessing-artifact configuration."""
 
 import json
 import os
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import torch
@@ -10,14 +11,16 @@ import torch
 
 # NOTE: Not using field() for class attributes - we want simple defaults without dataclass field overhead
 @dataclass
-class GeneralConfig:
-    """General configuration for runtime and dataset information.
+class DatasetConfig:
+    """Configuration for a specific dataset.
 
-    Attributes:
-        dataset_name: Name of the dataset to load preprocessing artifacts for
+    This object is responsible for:
+    - selecting the dataset (via `dataset_name`)
+    - locating preprocessing artifacts under `outputs/preprocessed/<dataset_name>`
+    - exposing derived dataset properties (species/phys and their counts)
     """
 
-    dataset_name: str = "uclchem_grav"
+    dataset_name: str
 
     # Class-level constants (not affected by dataset_name)
     working_path: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,6 +40,7 @@ class GeneralConfig:
     preprocessing_dir: str = None  # type: ignore
     dataset_path: str = None  # type: ignore
     columns_mapping_path: str = None  # type: ignore
+    weights_dir: str = None  # type: ignore
     physical_parameter_ranges: dict[str, tuple[float, float]] = None  # type: ignore
     stoichiometric_matrix: np.ndarray = None  # type: ignore
     species: list[str] = None  # type: ignore
@@ -51,6 +55,11 @@ class GeneralConfig:
         self.preprocessing_dir = os.path.join(
             self.project_root, "outputs", "preprocessed", self.dataset_name
         )
+
+        self.weights_dir = os.path.join(
+            self.project_root, "outputs", "weights", self.dataset_name
+        )
+        os.makedirs(self.weights_dir, exist_ok=True)
         # Dataset is now stored in the preprocessing output directory as .npy files
         self.dataset_path = self.preprocessing_dir
         # Path to columns mapping JSON (prefer mapping written by the preprocessor)
@@ -99,3 +108,25 @@ class GeneralConfig:
         return {
             param: (info["min"], info["max"]) for param, info in ranges_data.items()
         }
+
+
+@dataclass(frozen=True)
+class DatasetSpec:
+    """Dataset-specific model configuration overrides.
+
+    This keeps dataset selection (e.g. `carbox_grav`) as the single runtime switch
+    that determines which AE/EM hyperparameters and weight paths to use.
+    """
+
+    dataset_name: str
+    ae_kwargs: dict[str, Any] = field(default_factory=dict)
+    em_kwargs: dict[str, Any] = field(default_factory=dict)
+
+
+DATASET_SPECS: dict[str, DatasetSpec] = {
+    "uclchem_grav": DatasetSpec(dataset_name="uclchem_grav"),
+    "carbox_grav": DatasetSpec(dataset_name="carbox_grav"),
+}
+
+
+AVAILABLE_DATASETS: list[str] = list(DATASET_SPECS.keys())

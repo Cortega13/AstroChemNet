@@ -1,8 +1,8 @@
 """Training script for emulator model."""
 
 from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 
 from .. import data_loading as dl
 from .. import data_processing as dp
@@ -16,7 +16,7 @@ from ..trainer import EmulatorTrainerSequential, load_objects
 def main(
     Autoencoder: type[Autoencoder],
     Emulator: type[Emulator],
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
     em_config: EMConfig,
 ) -> None:
@@ -75,9 +75,15 @@ def main(
 
 if __name__ == "__main__":
     # Instantiate configs - GeneralConfig loads from preprocessing output
-    general_config = GeneralConfig(dataset_name="uclchem_grav")
-    ae_config = AEConfig(general_config=general_config)
-    em_config = EMConfig(general_config=general_config, ae_config=ae_config)
+    from src.configs.factory import (
+        build_ae_config,
+        build_dataset_config,
+        build_em_config,
+    )
+
+    general_config = build_dataset_config("uclchem_grav")
+    ae_config = build_ae_config(general_config)
+    em_config = build_em_config(general_config, ae_config)
 
     # Run main script.
     main(Autoencoder, Emulator, general_config, ae_config, em_config)

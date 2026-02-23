@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass, field
 
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 
 
 @dataclass
@@ -11,12 +11,12 @@ class AEConfig:
     """Autoencoder model configuration with hyperparameters and paths.
 
     Args:
-        general_config: GeneralConfig instance for dataset-specific settings
+        dataset_config: DatasetConfig instance for dataset-specific settings
     """
 
-    general_config: GeneralConfig = field(default_factory=lambda: GeneralConfig())
+    dataset_config: DatasetConfig
 
-    # Derived from general_config (set in __post_init__)
+    # Derived from dataset_config (set in __post_init__)
     columns: list[str] = field(init=False)
     num_columns: int = field(init=False)
     input_dim: int = field(init=False)
@@ -49,18 +49,19 @@ class AEConfig:
     save_model: bool = True
 
     def __post_init__(self) -> None:
-        """Initialize derived attributes from general_config."""
-        self.columns = self.general_config.species
+        """Initialize derived attributes from dataset_config."""
+        self.columns = self.dataset_config.species
         self.num_columns = len(self.columns)
-        self.input_dim = self.general_config.num_species  # input_dim = output_dim
+        self.input_dim = self.dataset_config.num_species  # input_dim = output_dim
 
         # Set up paths using preprocessing directory
         self.latents_minmax_path = os.path.join(
-            self.general_config.preprocessing_dir, "latents_minmax.npy"
+            self.dataset_config.preprocessing_dir, "latents_minmax.npy"
         )
+
         self.pretrained_model_path = os.path.join(
-            self.general_config.project_root, "outputs/weights/autoencoder.pth"
+            self.dataset_config.weights_dir, "autoencoder.pth"
         )
         self.save_model_path = os.path.join(
-            self.general_config.project_root, "outputs/weights/autoencoder.pth"
+            self.dataset_config.weights_dir, "autoencoder.pth"
         )

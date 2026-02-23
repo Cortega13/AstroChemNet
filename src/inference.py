@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 import torch
 
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 from src.models.autoencoder import Autoencoder
 from src.models.emulator import Emulator
 
@@ -15,7 +15,7 @@ class Inference:
 
     def __init__(
         self,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         processing_functions,
         autoencoder: Optional[Autoencoder] = None,
         emulator: Optional[Emulator] = None,

@@ -11,6 +11,8 @@ sys.path.insert(0, str(project_root))
 
 def main() -> None:
     """Main CLI entry point."""
+    from src.configs.datasets import AVAILABLE_DATASETS
+
     parser = argparse.ArgumentParser(
         description="ACNN: Autoencoder and Emulator Training CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -34,7 +36,7 @@ Examples:
     train_parser.add_argument(
         "--dataset",
         default="uclchem_grav",
-        choices=["uclchem_grav", "carbox_grav"],
+        choices=AVAILABLE_DATASETS,
         help="Dataset to use for training",
     )
 
@@ -42,8 +44,14 @@ Examples:
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=["uclchem_grav", "carbox_grav", "emulator"],
+        choices=[*AVAILABLE_DATASETS, "emulator"],
         help="Dataset to preprocess",
+    )
+    preprocess_parser.add_argument(
+        "--dataset-name",
+        default="uclchem_grav",
+        choices=AVAILABLE_DATASETS,
+        help="Dataset to use when preprocessing emulator sequences",
     )
     preprocess_parser.add_argument(
         "--force",
@@ -61,7 +69,7 @@ Examples:
     benchmark_parser.add_argument(
         "--dataset",
         default="uclchem_grav",
-        choices=["uclchem_grav", "carbox_grav"],
+        choices=AVAILABLE_DATASETS,
         help="Dataset to use for benchmarking",
     )
 
@@ -73,7 +81,9 @@ Examples:
     if args.command == "train":
         handle_train(args.model, dataset_name=args.dataset)
     elif args.command == "preprocess":
-        handle_preprocess(args.dataset, force=args.force)
+        handle_preprocess(
+            args.dataset, force=args.force, dataset_name=args.dataset_name
+        )
     elif args.command == "benchmark":
         handle_benchmark(args.model, dataset_name=args.dataset)
     else:

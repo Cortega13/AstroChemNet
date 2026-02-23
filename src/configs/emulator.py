@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 
 from src.configs.autoencoder import AEConfig
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 
 
 @dataclass
@@ -12,12 +12,12 @@ class EMConfig:
     """Emulator model configuration with hyperparameters and paths.
 
     Args:
-        general_config: GeneralConfig instance for dataset-specific settings
+        dataset_config: DatasetConfig instance for dataset-specific settings
         ae_config: AEConfig instance for autoencoder settings
     """
 
-    general_config: GeneralConfig = field(default_factory=lambda: GeneralConfig())
-    ae_config: AEConfig = field(default_factory=lambda: AEConfig())
+    dataset_config: DatasetConfig
+    ae_config: AEConfig
 
     # Derived from configs (set in __post_init__)
     columns: list[str] = field(init=False)
@@ -54,18 +54,16 @@ class EMConfig:
     def __post_init__(self) -> None:
         """Initialize derived attributes from configs."""
         self.columns = (
-            self.general_config.metadata
-            + self.general_config.phys
-            + self.general_config.species
+            self.dataset_config.metadata
+            + self.dataset_config.phys
+            + self.dataset_config.species
         )
         self.num_columns = len(self.columns)
-        self.input_dim = self.general_config.num_phys + self.ae_config.latent_dim
+        self.input_dim = self.dataset_config.num_phys + self.ae_config.latent_dim
         self.output_dim = self.ae_config.latent_dim
 
         # Set up paths
         self.pretrained_model_path = os.path.join(
-            self.general_config.project_root, "outputs/weights/mlp.pth"
+            self.dataset_config.weights_dir, "mlp.pth"
         )
-        self.save_model_path = os.path.join(
-            self.general_config.project_root, "outputs/weights/mlp.pth"
-        )
+        self.save_model_path = os.path.join(self.dataset_config.weights_dir, "mlp.pth")

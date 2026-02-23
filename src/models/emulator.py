@@ -5,8 +5,8 @@ import os
 import torch
 import torch.nn as nn
 
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 
 
 class Emulator(nn.Module):
@@ -53,7 +53,7 @@ class Emulator(nn.Module):
 
 def load_emulator(
     emulator_class: type[Emulator],
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     em_config: EMConfig,
     inference: bool = False,
 ) -> Emulator:

@@ -16,6 +16,75 @@ Enter the project directory.
 cd AstroChemNet
 ```
 
+## CLI quickstart
+
+This repository includes a small CLI in [`run.py`](run.py:1).
+
+### Install
+
+```sh
+python -m pip install -r requirements.txt
+```
+
+(If you want to run in an isolated environment, create/activate a venv first.)
+
+### End-to-end (recommended order)
+
+Per dataset, the intended order is:
+
+1. preprocess dataset → 2) train autoencoder → 3) preprocess emulator sequences → 4) train emulator → 5) benchmark
+
+### Preprocess
+
+```sh
+python run.py preprocess uclchem_grav
+python run.py preprocess carbox_grav
+```
+
+Preprocess emulator sequence artifacts for a chosen dataset:
+
+```sh
+python run.py preprocess emulator --dataset-name uclchem_grav
+python run.py preprocess emulator --dataset-name carbox_grav
+```
+
+### Train
+
+```sh
+python run.py train autoencoder --dataset uclchem_grav
+python run.py train emulator --dataset uclchem_grav
+```
+
+Train (carbox_grav example):
+
+```sh
+python run.py train autoencoder --dataset carbox_grav
+python run.py train emulator --dataset carbox_grav
+```
+
+### Benchmark
+
+```sh
+python run.py benchmark autoencoder --dataset uclchem_grav
+python run.py benchmark emulator --dataset uclchem_grav
+python run.py benchmark combined --dataset uclchem_grav
+```
+
+### Dataset-specific configs
+
+Dataset selection is the runtime switch that determines which AE/EM kwargs are applied.
+
+- registry: [`DATASET_SPECS`](src/configs/datasets.py:128) in [`src/configs/datasets.py`](src/configs/datasets.py:1)
+- builders: [`build_ae_config()`](src/configs/factory.py:38) / [`build_em_config()`](src/configs/factory.py:49) in [`src/configs/factory.py`](src/configs/factory.py:1)
+
+### Artifact locations
+
+- Preprocessing artifacts: `outputs/preprocessed/<dataset_name>/`
+- Model weights (dataset-scoped): `outputs/weights/<dataset_name>/`
+  - autoencoder: `autoencoder.pth`
+  - emulator: `mlp.pth`
+- Emulator sequence caches: `outputs/preprocessed/<dataset_name>/emulator/*.h5`
+
 ## Gravitational Collapse Benchmark
 
 ## Turbulent Gas Benchmark

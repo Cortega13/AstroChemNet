@@ -6,8 +6,8 @@ from typing import Optional, Tuple
 import torch
 
 from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 from src.data_processing import Processing
 
 
@@ -17,7 +17,7 @@ class Loss:
     def __init__(
         self,
         processing_functions: Processing,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         ModelConfig: Optional[AEConfig | EMConfig] = None,
     ) -> None:
         """Initialize Loss with processing functions and configuration."""

@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.configs.autoencoder import AEConfig
+    from src.configs.datasets import DatasetConfig
     from src.configs.emulator import EMConfig
-    from src.configs.general import GeneralConfig
     from src.inference import Inference
     from src.models.autoencoder import Autoencoder
 
@@ -15,7 +15,7 @@ from ..models.autoencoder import load_autoencoder
 
 
 def preprocess_emulator(
-    general_config: "GeneralConfig",
+    general_config: "DatasetConfig",
     ae_config: "AEConfig",
     em_config: "EMConfig",
     Autoencoder: type["Autoencoder"],

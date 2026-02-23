@@ -17,8 +17,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 from src.models.autoencoder import Autoencoder
 from src.models.emulator import Emulator
 
@@ -36,7 +36,7 @@ class Trainer:
 
     def __init__(
         self,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         model_config: AEConfig | EMConfig,
         model: Autoencoder | Emulator,
         optimizer: torch.optim.Optimizer,
@@ -200,7 +200,7 @@ class AutoencoderTrainer(Trainer):
 
     def __init__(
         self,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         ae_config: AEConfig,
         loss_functions: Loss,
         autoencoder: Autoencoder,
@@ -278,7 +278,7 @@ class EmulatorTrainerSequential(Trainer):
 
     def __init__(
         self,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         ae_config: AEConfig,
         em_config: EMConfig,
         loss_functions: Loss,

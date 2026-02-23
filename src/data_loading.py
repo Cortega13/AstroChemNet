@@ -11,11 +11,11 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 from src.configs.autoencoder import AEConfig
-from src.configs.general import GeneralConfig
+from src.configs.datasets import DatasetConfig
 
 
 def load_datasets(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     columns: List[str],
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Load training and validation datasets from .npy files as numpy arrays.
@@ -66,23 +66,28 @@ def load_datasets(
 
 
 def save_tensors_to_hdf5(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     tensors: Tuple[torch.Tensor, torch.Tensor],
     category: str,
 ) -> None:
     """Save dataset and indices tensors to HDF5 file for quick loading."""
     dataset, indices = tensors
-    dataset_path = os.path.join(general_config.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(
+        general_config.preprocessing_dir, "emulator", f"{category}.h5"
+    )
+    os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
     with h5py.File(dataset_path, "w") as f:
         f.create_dataset("dataset", data=dataset.numpy(), dtype=np.float32)
         f.create_dataset("indices", data=indices.numpy(), dtype=np.int32)
 
 
 def load_tensors_from_hdf5(
-    general_config: GeneralConfig, category: str
+    general_config: DatasetConfig, category: str
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load saved dataset and indices tensors from HDF5 file."""
-    dataset_path = os.path.join(general_config.working_path, f"data/{category}.h5")
+    dataset_path = os.path.join(
+        general_config.preprocessing_dir, "emulator", f"{category}.h5"
+    )
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]  # type:ignore
         indices = f["indices"][:]  # type:ignore
@@ -162,7 +167,7 @@ class EmulatorSequenceDataset(Dataset):
 
     def __init__(
         self,
-        general_config: GeneralConfig,
+        general_config: DatasetConfig,
         ae_config: AEConfig,
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,

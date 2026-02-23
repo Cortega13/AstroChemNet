@@ -5,8 +5,8 @@ from typing import Any, Dict
 import torch
 
 from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 from src.models.autoencoder import Autoencoder, load_autoencoder
 from src.models.emulator import Emulator, load_emulator
 
@@ -16,7 +16,7 @@ from .inference import Inference
 
 
 def benchmark_autoencoder(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
 ) -> Dict[str, Any]:
     """Benchmark autoencoder reconstruction accuracy.
@@ -65,7 +65,7 @@ def benchmark_autoencoder(
 
 
 def benchmark_emulator(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
     em_config: EMConfig,
 ) -> Dict[str, Any]:
@@ -133,7 +133,7 @@ def benchmark_emulator(
 
 
 def benchmark_combined(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     ae_config: AEConfig,
     em_config: EMConfig,
 ) -> Dict[str, Any]:

@@ -8,8 +8,8 @@ import torch
 from numba import njit
 
 from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
 from src.configs.emulator import EMConfig
-from src.configs.general import GeneralConfig
 
 from .inference import Inference
 
@@ -18,7 +18,7 @@ class Processing:
     """Group of preprocessing and postprocessing functions for data scaling."""
 
     def __init__(
-        self, general_config: GeneralConfig, ae_config: Optional[AEConfig] = None
+        self, general_config: DatasetConfig, ae_config: Optional[AEConfig] = None
     ) -> None:
         self.device = general_config.device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
@@ -190,7 +190,7 @@ def calculate_emulator_indices(
 
 
 def preprocessing_emulator_dataset(
-    general_config: GeneralConfig,
+    general_config: DatasetConfig,
     em_config: EMConfig,
     dataset_np: np.ndarray,
     processing_functions: Processing,
