@@ -37,37 +37,37 @@ Per dataset, the intended order is:
 ### Preprocess
 
 ```sh
-python run.py preprocess uclchem_grav
-python run.py preprocess carbox_grav
+python3 run.py preprocess uclchem_grav
+python3 run.py preprocess carbox_grav
 ```
 
 Preprocess emulator sequence artifacts for a chosen dataset:
 
 ```sh
-python run.py preprocess emulator --dataset-name uclchem_grav
-python run.py preprocess emulator --dataset-name carbox_grav
+python3 run.py preprocess emulator --dataset-name uclchem_grav
+python3 run.py preprocess emulator --dataset-name carbox_grav
 ```
 
 ### Train
 
 ```sh
-python run.py train autoencoder --dataset uclchem_grav
-python run.py train emulator --dataset uclchem_grav
+python3 run.py train autoencoder --dataset uclchem_grav
+python3 run.py train emulator --dataset uclchem_grav
 ```
 
 Train (carbox_grav example):
 
 ```sh
-python run.py train autoencoder --dataset carbox_grav
-python run.py train emulator --dataset carbox_grav
+python3 run.py train autoencoder --dataset carbox_grav
+python3 run.py train emulator --dataset carbox_grav
 ```
 
 ### Benchmark
 
 ```sh
-python run.py benchmark autoencoder --dataset uclchem_grav
-python run.py benchmark emulator --dataset uclchem_grav
-python run.py benchmark combined --dataset uclchem_grav
+python3 run.py benchmark autoencoder --dataset uclchem_grav
+python3 run.py benchmark emulator --dataset uclchem_grav
+python3 run.py benchmark combined --dataset uclchem_grav
 ```
 
 ### Dataset-specific configs

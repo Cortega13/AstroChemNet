@@ -1,13 +1,10 @@
 """Preprocessing script for emulator dataset."""
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.configs.autoencoder import AEConfig
-    from src.configs.datasets import DatasetConfig
-    from src.configs.emulator import EMConfig
-    from src.inference import Inference
-    from src.models.autoencoder import Autoencoder
+from src.configs.autoencoder import AEConfig
+from src.configs.datasets import DatasetConfig
+from src.configs.emulator import EMConfig
+from src.inference import Inference
+from src.models.autoencoder import Autoencoder
 
 from .. import data_loading as dl
 from .. import data_processing as dp

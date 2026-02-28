@@ -1,7 +1,7 @@
 """Data processing functions for preprocessing and postprocessing data scaling."""
 
 import gc
-from typing import Optional, Tuple, overload
+from typing import Optional, Tuple, Union, overload
 
 import numpy as np
 import torch
@@ -124,8 +124,8 @@ class Processing:
     def inverse_abundances_scaling(self, abundances: np.ndarray) -> None: ...
 
     def inverse_abundances_scaling(
-        self, abundances: torch.Tensor | np.ndarray
-    ) -> torch.Tensor | None:
+        self, abundances: Union[torch.Tensor, np.ndarray]
+    ) -> Optional[torch.Tensor]:
         """Reverse minmax scaling of abundances for torch or numpy arrays."""
         if isinstance(abundances, torch.Tensor):
             return self.jit_inverse_abundances_scaling(
