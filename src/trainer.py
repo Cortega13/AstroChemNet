@@ -30,6 +30,11 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
+# Optional PyTorch profiler -> Chrome trace JSON (open via chrome://tracing or Perfetto)
+PROFILE_TRAINING = False
+PROFILE_TRACE_PATH = "outputs/training_trace.json"
+PROFILE_EPOCHS = 3
+
 
 class Trainer:
     """Base trainer class with common training functionality."""
@@ -65,6 +70,7 @@ class Trainer:
         )
         self.stagnant_epochs = 0
         self.loss_per_epoch = []
+        self._profiler = None
 
     def save_loss_per_epoch(self) -> None:
         """Save the loss per epoch to a JSON file."""
@@ -181,11 +187,31 @@ class Trainer:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-        for epoch in range(9999999):
-            self._run_epoch(epoch)
-            self._check_minimum_loss()
-            if self._check_early_stopping():
-                break
+        start_epoch, stopped = 0, False
+        if PROFILE_TRAINING:
+            acts = [torch.profiler.ProfilerActivity.CPU] + (
+                [torch.profiler.ProfilerActivity.CUDA]
+                if str(self.device) == "cuda"
+                else []
+            )
+            start_epoch = PROFILE_EPOCHS
+            with torch.profiler.profile(activities=acts, record_shapes=True) as prof:
+                self._profiler = prof
+                for epoch in range(PROFILE_EPOCHS):
+                    self._run_epoch(epoch)
+                    self._check_minimum_loss()
+                    if self._check_early_stopping():
+                        start_epoch, stopped = epoch + 1, True
+                        break
+            self._profiler = None
+            prof.export_chrome_trace(PROFILE_TRACE_PATH)
+
+        if not stopped:
+            for epoch in range(start_epoch, 9999999):
+                self._run_epoch(epoch)
+                self._check_minimum_loss()
+                if self._check_early_stopping():
+                    break
 
         gc.collect()
         if str(self.device) == "cuda":
@@ -261,6 +287,8 @@ class AutoencoderTrainer(Trainer):
         for features in self.training_dataloader:
             features = features[0].to(self.device, non_blocking=True)
             self._run_training_batch(features)
+            if self._profiler:
+                self._profiler.step()
 
         tic2 = datetime.now()
         self.model.eval()
@@ -268,6 +296,8 @@ class AutoencoderTrainer(Trainer):
             for features in self.validation_dataloader:
                 features = features[0].to(self.device, non_blocking=True)
                 self._run_validation_batch(features)
+                if self._profiler:
+                    self._profiler.step()
 
         toc = datetime.now()
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}\n")
@@ -357,6 +387,8 @@ class EmulatorTrainerSequential(Trainer):
             features = features.to(self.device, non_blocking=True)
             targets = targets.to(self.device, non_blocking=True)
             self._run_training_batch(phys, features, targets)
+            if self._profiler:
+                self._profiler.step()
 
         tic2 = datetime.now()
 
@@ -367,6 +399,8 @@ class EmulatorTrainerSequential(Trainer):
                 features = features.to(self.device, non_blocking=True)
                 targets = targets.to(self.device, non_blocking=True)
                 self._run_validation_batch(phys, features, targets)
+                if self._profiler:
+                    self._profiler.step()
 
         toc = datetime.now()
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")

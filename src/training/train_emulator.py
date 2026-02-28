@@ -11,10 +11,6 @@ from ..models.autoencoder import Autoencoder, load_autoencoder
 from ..models.emulator import Emulator, load_emulator
 from ..trainer import EmulatorTrainerSequential, load_objects
 
-# Optional PyTorch profiler (writes a Chrome trace JSON).
-PROFILE_TRAINING = True
-PROFILE_TRACE_PATH = "outputs/emulator_training_trace.json"
-
 
 def main(
     Autoencoder: type[Autoencoder],
@@ -73,19 +69,7 @@ def main(
         training_dataloader,
         validation_dataloader,
     )
-    if PROFILE_TRAINING:
-        import torch
-
-        acts = [torch.profiler.ProfilerActivity.CPU] + (
-            [torch.profiler.ProfilerActivity.CUDA]
-            if str(general_config.device) == "cuda"
-            else []
-        )
-        with torch.profiler.profile(activities=acts, record_shapes=True) as p:
-            emulator_trainer.train()
-        p.export_chrome_trace(PROFILE_TRACE_PATH)
-    else:
-        emulator_trainer.train()
+    emulator_trainer.train()
 
 
 if __name__ == "__main__":
