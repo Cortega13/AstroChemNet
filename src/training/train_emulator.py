@@ -12,7 +12,7 @@ from ..models.emulator import Emulator, load_emulator
 from ..trainer import EmulatorTrainerSequential, load_objects
 
 # Optional PyTorch profiler (writes a Chrome trace JSON).
-PROFILE_TRAINING = False
+PROFILE_TRAINING = True
 PROFILE_TRACE_PATH = "outputs/emulator_training_trace.json"
 
 
