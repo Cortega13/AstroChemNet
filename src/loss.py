@@ -97,10 +97,13 @@ class Loss:
         # combine everything
         total_loss = 1e-3 * (mean_loss + alpha * worst_loss + conservation_error)
 
-        print(
-            f"Recon: {mean_loss.detach():.3e} | Worst: {worst_loss.detach():.3e} "
-            f"| Cons: {conservation_error.detach():.3e} | Total: {total_loss.detach():.3e}"
-        )
+        # NOTE: Per-batch printing of CUDA tensors forces host synchronization (implicit
+        # tensor->scalar conversion during formatting) and can dominate runtime on fast GPUs.
+        # If you need logging, do it less frequently and move values to CPU explicitly.
+        # print(
+        #     f"Recon: {mean_loss.detach():.3e} | Worst: {worst_loss.detach():.3e} "
+        #     f"| Cons: {conservation_error.detach():.3e} | Total: {total_loss.detach():.3e}"
+        # )
         return total_loss
 
     def validation(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:

@@ -6,11 +6,14 @@ from src.configs.emulator import EMConfig
 
 from .. import data_loading as dl
 from .. import data_processing as dp
-from ..inference import Inference
 from ..loss import Loss
 from ..models.autoencoder import Autoencoder, load_autoencoder
 from ..models.emulator import Emulator, load_emulator
 from ..trainer import EmulatorTrainerSequential, load_objects
+
+# Optional PyTorch profiler (writes a Chrome trace JSON).
+PROFILE_TRAINING = False
+PROFILE_TRACE_PATH = "outputs/emulator_training_trace.json"
 
 
 def main(
@@ -70,7 +73,19 @@ def main(
         training_dataloader,
         validation_dataloader,
     )
-    emulator_trainer.train()
+    if PROFILE_TRAINING:
+        import torch
+
+        acts = [torch.profiler.ProfilerActivity.CPU] + (
+            [torch.profiler.ProfilerActivity.CUDA]
+            if str(general_config.device) == "cuda"
+            else []
+        )
+        with torch.profiler.profile(activities=acts, record_shapes=True) as p:
+            emulator_trainer.train()
+        p.export_chrome_trace(PROFILE_TRACE_PATH)
+    else:
+        emulator_trainer.train()
 
 
 if __name__ == "__main__":
