@@ -5,6 +5,7 @@ import gc
 import json
 import os
 from abc import abstractmethod
+from contextlib import nullcontext
 from datetime import datetime
 from typing import Tuple, cast
 
@@ -35,7 +36,7 @@ PROFILE_TRAINING = True
 PROFILE_TRACE_PATH = (
     "/work/09338/carlos9/vista/AstroChemNet/outputs/training_trace.json"
 )
-PROFILE_EPOCHS = 3
+PROFILE_BATCHES = 5
 
 
 class Trainer:
@@ -189,31 +190,31 @@ class Trainer:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-        start_epoch, stopped = 0, False
+        ctx = nullcontext()
         if PROFILE_TRAINING:
             acts = [torch.profiler.ProfilerActivity.CPU] + (
                 [torch.profiler.ProfilerActivity.CUDA]
                 if str(self.device) == "cuda"
                 else []
             )
-            start_epoch = PROFILE_EPOCHS
-            with torch.profiler.profile(activities=acts, record_shapes=True) as prof:
-                self._profiler = prof
-                for epoch in range(PROFILE_EPOCHS):
-                    self._run_epoch(epoch)
-                    self._check_minimum_loss()
-                    if self._check_early_stopping():
-                        start_epoch, stopped = epoch + 1, True
-                        break
-            self._profiler = None
-            prof.export_chrome_trace(PROFILE_TRACE_PATH)
+            ctx = torch.profiler.profile(
+                activities=acts,
+                schedule=torch.profiler.schedule(
+                    wait=0, warmup=0, active=PROFILE_BATCHES
+                ),
+                record_shapes=True,
+            )
 
-        if not stopped:
-            for epoch in range(start_epoch, 9999999):
+        with ctx as prof:
+            self._profiler = prof if PROFILE_TRAINING else None
+            for epoch in range(9999999):
                 self._run_epoch(epoch)
                 self._check_minimum_loss()
                 if self._check_early_stopping():
                     break
+        self._profiler = None
+        if PROFILE_TRAINING and prof is not None:
+            prof.export_chrome_trace(PROFILE_TRACE_PATH)
 
         gc.collect()
         if str(self.device) == "cuda":
@@ -298,8 +299,6 @@ class AutoencoderTrainer(Trainer):
             for features in self.validation_dataloader:
                 features = features[0].to(self.device, non_blocking=True)
                 self._run_validation_batch(features)
-                if self._profiler:
-                    self._profiler.step()
 
         toc = datetime.now()
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}\n")
@@ -401,8 +400,6 @@ class EmulatorTrainerSequential(Trainer):
                 features = features.to(self.device, non_blocking=True)
                 targets = targets.to(self.device, non_blocking=True)
                 self._run_validation_batch(phys, features, targets)
-                if self._profiler:
-                    self._profiler.step()
 
         toc = datetime.now()
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")
