@@ -30,7 +30,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
-RUN_EMULATOR_PROFILE_EPOCH = False
+RUN_EMULATOR_PROFILE_EPOCH = True
 EMULATOR_PROFILE_TRACE_PATH = (
     "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
 )
