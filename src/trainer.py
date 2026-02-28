@@ -30,9 +30,10 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
-# Optional: run 1 profiled epoch and export a Chrome trace (open via chrome://tracing)
-PROFILE_ONE_EPOCH = True
-PROFILE_TRACE_PATH = "outputs/torch_profile_trace.json"
+RUN_EMULATOR_PROFILE_EPOCH = False
+EMULATOR_PROFILE_TRACE_PATH = (
+    "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
+)
 
 
 class Trainer:
@@ -185,21 +186,7 @@ class Trainer:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-        start_epoch = 0
-        if PROFILE_ONE_EPOCH:
-            from torch.profiler import ProfilerActivity, profile
-
-            os.makedirs(os.path.dirname(PROFILE_TRACE_PATH) or ".", exist_ok=True)
-            acts = [ProfilerActivity.CPU] + (
-                [ProfilerActivity.CUDA] if str(self.device) == "cuda" else []
-            )
-            with profile(activities=acts) as prof:
-                self._run_epoch(0)
-            prof.export_chrome_trace(PROFILE_TRACE_PATH)
-            self._check_minimum_loss()
-            start_epoch = 1
-
-        for epoch in range(start_epoch, 9999999):
+        for epoch in range(9999999):
             self._run_epoch(epoch)
             self._check_minimum_loss()
             if self._check_early_stopping():
@@ -328,6 +315,45 @@ class EmulatorTrainerSequential(Trainer):
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
         )
+
+    def _profile_epoch(self, warmup_batches: int = 1, prof_batches: int = 3) -> None:
+        """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""
+        self.model.train()
+        it = iter(self.training_dataloader)
+        for _ in range(warmup_batches):
+            phys, features, targets = next(it)
+            self._run_training_batch(
+                phys.to(self.device, non_blocking=True),
+                features.to(self.device, non_blocking=True),
+                targets.to(self.device, non_blocking=True),
+            )
+        acts = [torch.profiler.ProfilerActivity.CPU] + (
+            [torch.profiler.ProfilerActivity.CUDA] if str(self.device) == "cuda" else []
+        )
+        with torch.profiler.profile(activities=acts) as p:
+            for _ in range(prof_batches):
+                phys, features, targets = next(it)
+                self._run_training_batch(
+                    phys.to(self.device, non_blocking=True),
+                    features.to(self.device, non_blocking=True),
+                    targets.to(self.device, non_blocking=True),
+                )
+                p.step()
+        if str(self.device) == "cuda":
+            torch.cuda.synchronize()
+        if not torch.distributed.is_available() or (
+            not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
+        ):
+            os.makedirs(
+                os.path.dirname(EMULATOR_PROFILE_TRACE_PATH) or ".", exist_ok=True
+            )
+            p.export_chrome_trace(EMULATOR_PROFILE_TRACE_PATH)
+
+    def train(self) -> None:
+        """Just adding a profile epoch before training."""
+        if RUN_EMULATOR_PROFILE_EPOCH:
+            self._profile_epoch()
+        super().train()
 
     def _run_training_batch(
         self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
