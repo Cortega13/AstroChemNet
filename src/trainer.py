@@ -31,8 +31,10 @@ torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
 # Optional PyTorch profiler -> Chrome trace JSON (open via chrome://tracing or Perfetto)
-PROFILE_TRAINING = False
-PROFILE_TRACE_PATH = "outputs/training_trace.json"
+PROFILE_TRAINING = True
+PROFILE_TRACE_PATH = (
+    "/work/09338/carlos9/vista/AstroChemNet/outputs/training_trace.json"
+)
 PROFILE_EPOCHS = 3
 
 
