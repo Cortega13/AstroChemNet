@@ -35,6 +35,9 @@ EMULATOR_PROFILE_TRACE_PATH = (
     "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
 )
 
+COMPILE_EMULATOR = True
+TORCH_COMPILE_MODE = "reduce-overhead"
+
 
 class Trainer:
     """Base trainer class with common training functionality."""
@@ -315,6 +318,17 @@ class EmulatorTrainerSequential(Trainer):
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
         )
+
+        # Optional: fuse/compile graphs to reduce kernel-launch overhead.
+        if (
+            COMPILE_EMULATOR
+            and str(self.device) == "cuda"
+            and hasattr(torch, "compile")
+        ):
+            try:
+                self.model = torch.compile(self.model, mode=TORCH_COMPILE_MODE)
+            except Exception as e:
+                print(f"torch.compile disabled (emulator): {e}")
 
     def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
         """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""

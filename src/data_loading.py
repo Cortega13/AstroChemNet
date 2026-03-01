@@ -202,11 +202,15 @@ class EmulatorSequenceDataset(Dataset):
         data_indices = self.data_indices[indices_tensor]
         rows = self.data_matrix[data_indices]
 
+        # NOTE: These slices are typically non-contiguous views. Returning contiguous
+        # tensors avoids implicit contiguous/clone work later during H2D `.to()`.
         physical_parameters = rows[
             :, :-1, self.num_metadata : self.num_metadata + self.num_phys
-        ]
-        features = rows[:, 0, -self.num_latents :]
-        targets = rows[:, 1:, self.num_metadata + self.num_phys : -self.num_latents]
+        ].contiguous()
+        features = rows[:, 0, -self.num_latents :].contiguous()
+        targets = rows[
+            :, 1:, self.num_metadata + self.num_phys : -self.num_latents
+        ].contiguous()
 
         return physical_parameters, features, targets
 
