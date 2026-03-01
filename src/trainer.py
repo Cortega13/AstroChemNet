@@ -316,7 +316,7 @@ class EmulatorTrainerSequential(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-    def _profile_epoch(self, warmup_batches: int = 1, prof_batches: int = 3) -> None:
+    def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
         """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""
         self.model.train()
         it = iter(self.training_dataloader)
