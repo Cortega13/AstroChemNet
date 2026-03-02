@@ -30,6 +30,13 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
+try:
+    import torch._dynamo as dynamo  # type: ignore
+
+    dynamo.config.suppress_errors = True
+except Exception:
+    pass
+
 RUN_EMULATOR_PROFILE_EPOCH = True
 EMULATOR_PROFILE_TRACE_PATH = (
     "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
@@ -319,16 +326,21 @@ class EmulatorTrainerSequential(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-        # Optional: fuse/compile graphs to reduce kernel-launch overhead.
+        # Optional: torch.compile (requires triton).
         if (
             COMPILE_EMULATOR
             and str(self.device) == "cuda"
             and hasattr(torch, "compile")
         ):
             try:
-                self.model = torch.compile(self.model, mode=TORCH_COMPILE_MODE)
+                import triton  # type: ignore  # noqa: F401
             except Exception as e:
-                print(f"torch.compile disabled (emulator): {e}")
+                print(f"torch.compile disabled (no triton): {e}")
+            else:
+                try:
+                    self.model = torch.compile(self.model, mode=TORCH_COMPILE_MODE)
+                except Exception as e:
+                    print(f"torch.compile disabled (emulator): {e}")
 
     def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
         """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""
