@@ -10,9 +10,11 @@ from typing import Tuple, cast
 
 import numpy as np
 import torch
+import torch._dynamo as dynamo
 from torch import optim
 from torch.backends import cudnn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
@@ -25,24 +27,18 @@ from src.models.emulator import Emulator
 from . import data_processing as dp
 from .loss import Loss
 
+dynamo.config.suppress_errors = True
 cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
-try:
-    import torch._dynamo as dynamo  # type: ignore
-
-    dynamo.config.suppress_errors = True
-except Exception:
-    pass
 
 RUN_EMULATOR_PROFILE_EPOCH = True
 EMULATOR_PROFILE_TRACE_PATH = (
     "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
 )
 
-COMPILE_EMULATOR = True
 TORCH_COMPILE_MODE = "reduce-overhead"
 
 
@@ -54,8 +50,8 @@ class Trainer:
         general_config: DatasetConfig,
         model_config: AEConfig | EMConfig,
         model: Autoencoder | Emulator,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
+        optimizer: Optimizer,
+        scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
@@ -219,19 +215,14 @@ class AutoencoderTrainer(Trainer):
         ae_config: AEConfig,
         loss_functions: Loss,
         autoencoder: Autoencoder,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
+        optimizer: Optimizer,
+        scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
         """Initialize AutoencoderTrainer with model config, loss functions, and data loaders."""
-        self.num_metadata = general_config.num_metadata
-        self.num_phys = general_config.num_phys
-        self.num_species = general_config.num_species
-        self.num_components = ae_config.latent_dim
         self.gradient_clipping = ae_config.gradient_clipping
 
-        self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
 
@@ -244,6 +235,8 @@ class AutoencoderTrainer(Trainer):
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
         )
+
+        self.model = cast(Autoencoder, self.model)
 
     def _run_training_batch(self, features: torch.Tensor) -> None:
         """Run a training batch where features = targets (autoencoder)."""
@@ -260,8 +253,8 @@ class AutoencoderTrainer(Trainer):
 
     def _run_validation_batch(self, features: torch.Tensor) -> None:
         """Run a validation batch where features = targets (autoencoder)."""
-        component_outputs = self.ae.encode(features)
-        outputs = self.ae.decode(component_outputs)
+        component_outputs = self.model.encode(features)
+        outputs = self.model.decode(component_outputs)
 
         loss = self.validation_loss(outputs, features)
         self.epoch_validation_loss += loss
@@ -300,8 +293,8 @@ class EmulatorTrainerSequential(Trainer):
         processing_functions: dp.Processing,
         autoencoder: Autoencoder,
         emulator: Emulator,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
+        optimizer: Optimizer,
+        scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
@@ -326,21 +319,7 @@ class EmulatorTrainerSequential(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-        # Optional: torch.compile (requires triton).
-        if (
-            COMPILE_EMULATOR
-            and str(self.device) == "cuda"
-            and hasattr(torch, "compile")
-        ):
-            try:
-                import triton  # type: ignore  # noqa: F401
-            except Exception as e:
-                print(f"torch.compile disabled (no triton): {e}")
-            else:
-                try:
-                    self.model = torch.compile(self.model, mode=TORCH_COMPILE_MODE)
-                except Exception as e:
-                    print(f"torch.compile disabled (emulator): {e}")
+        self.model = cast(Emulator, torch.compile(self.model, mode=TORCH_COMPILE_MODE))
 
     def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
         """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""
