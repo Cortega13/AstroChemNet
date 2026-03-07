@@ -9,7 +9,6 @@ import numpy as np
 import torch
 
 
-# NOTE: Not using field() for class attributes - we want simple defaults without dataclass field overhead
 @dataclass
 class DatasetConfig:
     """Configuration for a specific dataset.
@@ -37,17 +36,17 @@ class DatasetConfig:
     metadata: list[str] = field(default_factory=lambda: ["Index", "Model", "Time"])
 
     # Instance attributes loaded from preprocessing output
-    preprocessing_dir: str = None  # type: ignore
-    dataset_path: str = None  # type: ignore
-    columns_mapping_path: str = None  # type: ignore
-    weights_dir: str = None  # type: ignore
-    physical_parameter_ranges: dict[str, tuple[float, float]] = None  # type: ignore
-    stoichiometric_matrix: np.ndarray = None  # type: ignore
-    species: list[str] = None  # type: ignore
-    phys: list[str] = None  # type: ignore
-    num_metadata: int = None  # type: ignore
-    num_phys: int = None  # type: ignore
-    num_species: int = None  # type: ignore
+    preprocessing_dir: str = field(init=False)
+    dataset_path: str = field(init=False)
+    columns_mapping_path: str = field(init=False)
+    weights_dir: str = field(init=False)
+    physical_parameter_ranges: dict[str, tuple[float, float]] = field(init=False)
+    stoichiometric_matrix: np.ndarray = field(init=False)
+    species: list[str] = field(init=False)
+    phys: list[str] = field(init=False)
+    num_metadata: int = field(init=False)
+    num_phys: int = field(init=False)
+    num_species: int = field(init=False)
 
     def __post_init__(self) -> None:
         """Load configuration from preprocessing output after initialization."""
@@ -111,22 +110,34 @@ class DatasetConfig:
 
 
 @dataclass(frozen=True)
-class DatasetSpec:
-    """Dataset-specific model configuration overrides.
+class DatasetPreset:
+    """Dataset-scoped configuration preset.
 
-    This keeps dataset selection (e.g. `carbox_grav`) as the single runtime switch
-    that determines which AE/EM hyperparameters and weight paths to use.
+    Dataset selection (e.g. `carbox_grav`) should be the single runtime switch
+    that determines which overrides apply.
+
+    Notes:
+        Keep *instances* of :class:`~src.configs.datasets.DatasetConfig` out of
+        the module-level registry to avoid import-time file I/O.
     """
 
-    dataset_name: str
+    # Kwargs applied when building DatasetConfig(dataset_name=..., **dataset_kwargs)
+    dataset_kwargs: dict[str, Any] = field(default_factory=dict)
+
+    # Kwargs applied when building AEConfig(dataset_config=..., **ae_kwargs)
     ae_kwargs: dict[str, Any] = field(default_factory=dict)
+
+    # Kwargs applied when building EMConfig(dataset_config=..., ae_config=..., **em_kwargs)
     em_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
-DATASET_SPECS: dict[str, DatasetSpec] = {
-    "uclchem_grav": DatasetSpec(dataset_name="uclchem_grav"),
-    "carbox_grav": DatasetSpec(dataset_name="carbox_grav"),
+# Central registry used by src/configs/factory.py builders.
+DATASET_PRESETS: dict[str, DatasetPreset] = {
+    "uclchem_grav": DatasetPreset(
+        dataset_kwargs={"abundances_lower_clipping": np.float32(1e-16)}
+    ),
+    "carbox_grav": DatasetPreset(),
 }
 
 
-AVAILABLE_DATASETS: list[str] = list(DATASET_SPECS.keys())
+AVAILABLE_DATASETS: list[str] = list(DATASET_PRESETS.keys())

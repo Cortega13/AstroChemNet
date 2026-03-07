@@ -1,10 +1,10 @@
 """Configuration package."""
 
-from .datasets import AVAILABLE_DATASETS, DATASET_SPECS, DatasetConfig, DatasetSpec
+from .datasets import AVAILABLE_DATASETS, DATASET_PRESETS, DatasetConfig, DatasetPreset
 
 __all__ = [
     "AVAILABLE_DATASETS",
-    "DATASET_SPECS",
+    "DATASET_PRESETS",
     "DatasetConfig",
-    "DatasetSpec",
+    "DatasetPreset",
 ]
