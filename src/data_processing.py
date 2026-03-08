@@ -9,7 +9,7 @@ from numba import njit
 
 from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DatasetConfig
-from src.configs.emulator import EMConfig
+from src.configs.latent_autoregressive import ARConfig
 
 from .inference import Inference
 
@@ -163,11 +163,11 @@ class Processing:
 
 
 @njit
-def calculate_emulator_indices(
+def calculate_latent_autoregressive_indices(
     dataset_np: np.ndarray,
     window_size: int = 16,
 ) -> np.ndarray:
-    """Generate indices for emulator training sequences with overlapping windows."""
+    """Generate indices for latent autoregressive training sequences with overlapping windows."""
     change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
     model_groups = np.split(dataset_np, change_indices)
 
@@ -189,14 +189,14 @@ def calculate_emulator_indices(
     return sequences
 
 
-def preprocessing_emulator_dataset(
+def preprocessing_latent_autoregressive_dataset(
     general_config: DatasetConfig,
-    em_config: EMConfig,
+    ar_config: ARConfig,
     dataset_np: np.ndarray,
     processing_functions: Processing,
     inference_functions: Inference,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Preprocess dataset for emulator training with indices and latent components."""
+    """Preprocess dataset for latent autoregressive training with indices and latent components."""
     num_species = general_config.num_species
     num_phys = general_config.num_phys
     num_metadata = general_config.num_metadata
@@ -216,8 +216,8 @@ def preprocessing_emulator_dataset(
     )
     encoded_dataset_np = np.hstack((dataset_np, latent_components), dtype=np.float32)
 
-    index_pairs_np = calculate_emulator_indices(
-        encoded_dataset_np, em_config.window_size
+    index_pairs_np = calculate_latent_autoregressive_indices(
+        encoded_dataset_np, ar_config.window_size
     )
 
     perm = np.random.permutation(len(index_pairs_np))

@@ -73,7 +73,7 @@ def save_tensors_to_hdf5(
     """Save dataset and indices tensors to HDF5 file for quick loading."""
     dataset, indices = tensors
     dataset_path = os.path.join(
-        general_config.preprocessing_dir, "emulator", f"{category}.h5"
+        general_config.preprocessing_dir, "latent_autoregressive", f"{category}.h5"
     )
     os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
     with h5py.File(dataset_path, "w") as f:
@@ -86,7 +86,7 @@ def load_tensors_from_hdf5(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load saved dataset and indices tensors from HDF5 file."""
     dataset_path = os.path.join(
-        general_config.preprocessing_dir, "emulator", f"{category}.h5"
+        general_config.preprocessing_dir, "latent_autoregressive", f"{category}.h5"
     )
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]  # type:ignore
@@ -162,8 +162,8 @@ class AutoencoderDataset(Dataset):
         return features, 1
 
 
-class EmulatorSequenceDataset(Dataset):
-    """Tensor Dataset for emulator training with memory-efficient sequence handling."""
+class ARSequenceDataset(Dataset):
+    """Tensor Dataset for latent autoregressive training with memory-efficient sequence handling."""
 
     def __init__(
         self,
@@ -172,7 +172,7 @@ class EmulatorSequenceDataset(Dataset):
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
     ) -> None:
-        """Initialize the emulator dataset with data matrix and indices."""
+        """Initialize the latent autoregressive dataset with data matrix and indices."""
         self.device = general_config.device
         self.data_matrix = data_matrix.contiguous()
         self.data_indices = data_indices.contiguous()

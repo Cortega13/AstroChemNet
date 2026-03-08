@@ -1,24 +1,24 @@
 """CLI command handlers for training, preprocessing, and benchmarking."""
 
-from src.configs.factory import build_ae_config, build_dataset_config, build_em_config
+from src.configs.factory import build_ae_config, build_dataset_config, build_ar_config
 from src.models.autoencoder import Autoencoder
-from src.models.emulator import Emulator
+from src.models.latent_autoregressive import LatentAR
 
 from . import benchmark
 from .preprocessing import (
     get_preprocessor,
     list_available_datasets,
-    preprocess_emulator,
+    preprocess_latent_autoregressive,
 )
 from .training.train_autoencoder import main as train_autoencoder
-from .training.train_emulator import main as train_emulator
+from .training.train_latent_autoregressive import main as train_latent_autoregressive
 
 
 def handle_train(model: str, dataset_name: str = "uclchem_grav") -> None:
-    """Handle train command for autoencoder or emulator.
+    """Handle train command for autoencoder or latent autoregressive.
 
     Args:
-        model: Model type to train ('autoencoder' or 'emulator')
+        model: Model type to train ('autoencoder' or 'latent_autoregressive')
         dataset_name: Name of the dataset to use for training
     """
     dataset_config = build_dataset_config(dataset_name)
@@ -28,11 +28,13 @@ def handle_train(model: str, dataset_name: str = "uclchem_grav") -> None:
         print(f"Training Autoencoder on {dataset_config.device}")
         train_autoencoder(Autoencoder, dataset_config, ae_config)
 
-    elif model == "emulator":
+    elif model == "latent_autoregressive":
         ae_config = build_ae_config(dataset_config)
-        em_config = build_em_config(dataset_config, ae_config)
-        print(f"Training Emulator on {dataset_config.device}")
-        train_emulator(Autoencoder, Emulator, dataset_config, ae_config, em_config)
+        ar_config = build_ar_config(dataset_config, ae_config)
+        print(f"Training LatentAR on {dataset_config.device}")
+        train_latent_autoregressive(
+            Autoencoder, LatentAR, dataset_config, ae_config, ar_config
+        )
 
 
 def handle_preprocess(
@@ -43,17 +45,19 @@ def handle_preprocess(
     """Handle preprocess command for dataset preparation.
 
     Args:
-        dataset: Dataset name to preprocess ('uclchem_grav' or 'emulator')
+        dataset: Dataset name to preprocess ('uclchem_grav' or 'latent_autoregressive')
         force: If True, overwrite existing preprocessing output
     """
-    # Special handling for emulator preprocessing
-    if dataset == "emulator":
+    # Special handling for latent autoregressive preprocessing
+    if dataset == "latent_autoregressive":
         dataset_config = build_dataset_config(dataset_name)
         ae_config = build_ae_config(dataset_config)
-        em_config = build_em_config(dataset_config, ae_config)
-        print("Preprocessing emulator dataset...")
-        preprocess_emulator(dataset_config, ae_config, em_config, Autoencoder)
-        print("Emulator preprocessing complete.")
+        ar_config = build_ar_config(dataset_config, ae_config)
+        print("Preprocessing latent autoregressive dataset...")
+        preprocess_latent_autoregressive(
+            dataset_config, ae_config, ar_config, Autoencoder
+        )
+        print("LatentAR preprocessing complete.")
         return
 
     # Standard dataset preprocessing
@@ -71,7 +75,7 @@ def handle_benchmark(model: str, dataset_name: str = "uclchem_grav") -> None:
     """Handle benchmark command for model evaluation.
 
     Args:
-        model: Model type to benchmark ('autoencoder', 'emulator', or 'combined')
+        model: Model type to benchmark ('autoencoder', 'latent_autoregressive', or 'combined')
         dataset_name: Name of the dataset to use for benchmarking
     """
     dataset_config = build_dataset_config(dataset_name)
@@ -82,14 +86,16 @@ def handle_benchmark(model: str, dataset_name: str = "uclchem_grav") -> None:
         results = benchmark.benchmark_autoencoder(dataset_config, ae_config)
         print(f"Autoencoder Results: {results}")
 
-    elif model == "emulator":
-        em_config = build_em_config(dataset_config, ae_config)
-        print("Benchmarking Emulator...")
-        results = benchmark.benchmark_emulator(dataset_config, ae_config, em_config)
-        print(f"Emulator Results: {results}")
+    elif model == "latent_autoregressive":
+        ar_config = build_ar_config(dataset_config, ae_config)
+        print("Benchmarking LatentAR...")
+        results = benchmark.benchmark_latent_autoregressive(
+            dataset_config, ae_config, ar_config
+        )
+        print(f"LatentAR Results: {results}")
 
     elif model == "combined":
-        em_config = build_em_config(dataset_config, ae_config)
-        print("Benchmarking Combined Pipeline (Emulator + Autoencoder)...")
-        results = benchmark.benchmark_combined(dataset_config, ae_config, em_config)
+        ar_config = build_ar_config(dataset_config, ae_config)
+        print("Benchmarking Combined Pipeline (LatentAR + Autoencoder)...")
+        results = benchmark.benchmark_combined(dataset_config, ae_config, ar_config)
         print(f"Combined Results: {results}")

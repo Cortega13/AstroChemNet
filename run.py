@@ -14,12 +14,12 @@ def main() -> None:
     from src.configs.datasets import AVAILABLE_DATASETS
 
     parser = argparse.ArgumentParser(
-        description="ACNN: Autoencoder and Emulator Training CLI",
+        description="ACNN: Autoencoder and Latent Autoregressive Training CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python run.py train autoencoder     Train the autoencoder model
-  python run.py train emulator        Train the emulator model
+  python run.py train latent_autoregressive        Train the latent autoregressive model
   python run.py preprocess uclchem_grav  Preprocess dataset
   python run.py benchmark combined    Benchmark full pipeline
         """,
@@ -30,7 +30,7 @@ Examples:
     train_parser = subparsers.add_parser("train", help="Train models")
     train_parser.add_argument(
         "model",
-        choices=["autoencoder", "emulator"],
+        choices=["autoencoder", "latent_autoregressive"],
         help="Model to train",
     )
     train_parser.add_argument(
@@ -44,14 +44,14 @@ Examples:
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=[*AVAILABLE_DATASETS, "emulator"],
+        choices=[*AVAILABLE_DATASETS, "latent_autoregressive"],
         help="Dataset to preprocess",
     )
     preprocess_parser.add_argument(
         "--dataset-name",
         default="uclchem_grav",
         choices=AVAILABLE_DATASETS,
-        help="Dataset to use when preprocessing emulator sequences",
+        help="Dataset to use when preprocessing latent autoregressive sequences",
     )
     preprocess_parser.add_argument(
         "--force",
@@ -63,7 +63,7 @@ Examples:
     benchmark_parser = subparsers.add_parser("benchmark", help="Benchmark models")
     benchmark_parser.add_argument(
         "model",
-        choices=["autoencoder", "emulator", "combined"],
+        choices=["autoencoder", "latent_autoregressive", "combined"],
         help="Model to benchmark",
     )
     benchmark_parser.add_argument(

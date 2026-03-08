@@ -1,4 +1,4 @@
-"""Loss functions for autoencoder and emulator training."""
+"""Loss functions for autoencoder and latent autoregressive training."""
 
 from collections.abc import Callable
 from typing import Optional, Tuple
@@ -7,18 +7,18 @@ import torch
 
 from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DatasetConfig
-from src.configs.emulator import EMConfig
+from src.configs.latent_autoregressive import ARConfig
 from src.data_processing import Processing
 
 
 class Loss:
-    """Loss functions for training autoencoder and emulator models."""
+    """Loss functions for training autoencoder and latent autoregressive models."""
 
     def __init__(
         self,
         processing_functions: Processing,
         general_config: DatasetConfig,
-        ModelConfig: Optional[AEConfig | EMConfig] = None,
+        ModelConfig: Optional[AEConfig | ARConfig] = None,
     ) -> None:
         """Initialize Loss with processing functions and configuration."""
         device = general_config.device

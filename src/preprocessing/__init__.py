@@ -3,14 +3,14 @@
 from typing import Callable, Dict
 
 from .carbox_grav_preprocessing import preprocess_carbox_grav
-from .emulator_preprocessing import preprocess_emulator
+from .latent_autoregressive_preprocessing import preprocess_latent_autoregressive
 from .uclchem_grav_preprocessing import preprocess_uclchem_grav
 
 # Registry of available preprocessors
 PREPROCESSORS: Dict[str, Callable[..., None]] = {
     "uclchem_grav": preprocess_uclchem_grav,
     "carbox_grav": preprocess_carbox_grav,
-    "emulator": preprocess_emulator,
+    "latent_autoregressive": preprocess_latent_autoregressive,
 }
 
 
@@ -27,7 +27,7 @@ def list_available_datasets() -> list[str]:
 __all__ = [
     "preprocess_uclchem_grav",
     "preprocess_carbox_grav",
-    "preprocess_emulator",
+    "preprocess_latent_autoregressive",
     "PREPROCESSORS",
     "get_preprocessor",
     "list_available_datasets",

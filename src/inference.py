@@ -7,7 +7,7 @@ import torch
 
 from src.configs.datasets import DatasetConfig
 from src.models.autoencoder import Autoencoder
-from src.models.emulator import Emulator
+from src.models.latent_autoregressive import LatentAR
 
 
 class Inference:
@@ -18,12 +18,12 @@ class Inference:
         general_config: DatasetConfig,
         processing_functions,
         autoencoder: Optional[Autoencoder] = None,
-        emulator: Optional[Emulator] = None,
+        latent_ar: Optional[LatentAR] = None,
     ) -> None:
         """Initialize Inference with config, processing functions, and models."""
         self.device = general_config.device
         self.autoencoder = autoencoder
-        self.emulator = emulator
+        self.latent_ar = latent_ar
 
         self.inverse_abundances_scaling = (
             processing_functions.inverse_abundances_scaling
@@ -68,22 +68,22 @@ class Inference:
         return abundances.view(B, T, -1) if reshaped else abundances
 
     def latent_emulate(self, phys, latents) -> torch.Tensor:
-        """Emulate evolution of latent components using emulator."""
-        assert self.emulator is not None, "Emulator is required for latent emulation"
+        """Emulate evolution of latent components using latent autoregressive."""
+        assert self.latent_ar is not None, "LatentAR is required for latent emulation"
         with torch.no_grad():
             phys = self.convert_to_tensor(phys)
             latents = self.convert_to_tensor(latents)
             scaled_latents = self.latent_components_scaling(latents)
-            scaled_evolved_latents = self.emulator(phys, scaled_latents)
+            scaled_evolved_latents = self.latent_ar(phys, scaled_latents)
             evolved_latents = self.inverse_latent_components_scaling(
                 scaled_evolved_latents
             )
             return evolved_latents
 
     def emulate(self, phys, abundances, skip_encoder: bool = False) -> torch.Tensor:
-        """Emulate evolution of abundances using autoencoder and emulator."""
+        """Emulate evolution of abundances using autoencoder and latent autoregressive."""
         assert self.autoencoder is not None, "Autoencoder is required for emulation"
-        assert self.emulator is not None, "Emulator is required for emulation"
+        assert self.latent_ar is not None, "LatentAR is required for emulation"
         latents = abundances if skip_encoder else self.encode(abundances)
         evolved_latents = self.latent_emulate(phys, latents)
         evolved_abundances = self.decode(evolved_latents)

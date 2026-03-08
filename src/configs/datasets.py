@@ -127,7 +127,7 @@ class DatasetPreset:
     # Kwargs applied when building AEConfig(dataset_config=..., **ae_kwargs)
     ae_kwargs: dict[str, Any] = field(default_factory=dict)
 
-    # Kwargs applied when building EMConfig(dataset_config=..., ae_config=..., **em_kwargs)
+    # Kwargs applied when building ARConfig(dataset_config=..., ae_config=..., **ar_kwargs)
     em_kwargs: dict[str, Any] = field(default_factory=dict)
 
 

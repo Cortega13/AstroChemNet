@@ -28,7 +28,7 @@ python -m pip install -r requirements.txt
 
 Per dataset, the intended order is:
 
-1. preprocess dataset → 2) train autoencoder → 3) preprocess emulator sequences → 4) train emulator → 5) benchmark
+1. preprocess dataset → 2) train autoencoder → 3) preprocess latent autoregressive sequences → 4) train latent autoregressive → 5) benchmark
 
 ### Preprocess
 
@@ -37,49 +37,49 @@ python3 run.py preprocess uclchem_grav
 python3 run.py preprocess carbox_grav
 ```
 
-Preprocess emulator sequence artifacts for a chosen dataset:
+Preprocess latent autoregressive sequence artifacts for a chosen dataset:
 
 ```sh
-python3 run.py preprocess emulator --dataset-name uclchem_grav
-python3 run.py preprocess emulator --dataset-name carbox_grav
+python3 run.py preprocess latent_autoregressive --dataset-name uclchem_grav
+python3 run.py preprocess latent_autoregressive --dataset-name carbox_grav
 ```
 
 ### Train
 
 ```sh
 python3 run.py train autoencoder --dataset uclchem_grav
-python3 run.py train emulator --dataset uclchem_grav
+python3 run.py train latent_autoregressive --dataset uclchem_grav
 ```
 
 Train (carbox_grav example):
 
 ```sh
 python3 run.py train autoencoder --dataset carbox_grav
-python3 run.py train emulator --dataset carbox_grav
+python3 run.py train latent_autoregressive --dataset carbox_grav
 ```
 
 ### Benchmark
 
 ```sh
 python3 run.py benchmark autoencoder --dataset uclchem_grav
-python3 run.py benchmark emulator --dataset uclchem_grav
+python3 run.py benchmark latent_autoregressive --dataset uclchem_grav
 python3 run.py benchmark combined --dataset uclchem_grav
 ```
 
 ### Dataset-specific configs
 
-Dataset selection is the runtime switch that determines which AE/EM kwargs are applied.
+Dataset selection is the runtime switch that determines which AE/AR kwargs are applied.
 
 - registry: [`DATASET_PRESETS`](src/configs/datasets.py:135) in [`src/configs/datasets.py`](src/configs/datasets.py:1)
-- builders: [`build_ae_config()`](src/configs/factory.py:44) / [`build_em_config()`](src/configs/factory.py:53) in [`src/configs/factory.py`](src/configs/factory.py:1)
+- builders: [`build_ae_config()`](src/configs/factory.py:44) / [`build_ar_config()`](src/configs/factory.py:53) in [`src/configs/factory.py`](src/configs/factory.py:1)
 
 ### Artifact locations
 
 - Preprocessing artifacts: `outputs/preprocessed/<dataset_name>/`
 - Model weights (dataset-scoped): `outputs/weights/<dataset_name>/`
   - autoencoder: `autoencoder.pth`
-  - emulator: `mlp.pth`
-- Emulator sequence caches: `outputs/preprocessed/<dataset_name>/emulator/*.h5`
+  - latent autoregressive: `latent_autoregressive.pth`
+- LatentAR sequence caches: `outputs/preprocessed/<dataset_name>/latent_autoregressive/*.h5`
 
 ## Gravitational Collapse Benchmark
 

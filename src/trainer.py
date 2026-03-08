@@ -1,4 +1,4 @@
-"""Trainer classes for autoencoder and emulator models."""
+"""Trainer classes for autoencoder and latent autoregressive models."""
 
 import copy
 import gc
@@ -20,9 +20,9 @@ from torch.utils.data.distributed import DistributedSampler
 
 from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DatasetConfig
-from src.configs.emulator import EMConfig
+from src.configs.latent_autoregressive import ARConfig
 from src.models.autoencoder import Autoencoder
-from src.models.emulator import Emulator
+from src.models.latent_autoregressive import LatentAR
 
 from . import data_processing as dp
 from .loss import Loss
@@ -34,9 +34,9 @@ torch.backends.cudnn.allow_tf32 = True
 torch.autograd.set_detect_anomaly(False)
 
 
-RUN_EMULATOR_PROFILE_EPOCH = True
-EMULATOR_PROFILE_TRACE_PATH = (
-    "/work/09338/carlos9/vista/AstroChemNet/outputs/emulator_profile_trace.json"
+RUN_LATENT_AR_PROFILE_EPOCH = True
+LATENT_AR_PROFILE_TRACE_PATH = (
+    "/work/09338/carlos9/vista/AstroChemNet/outputs/latent_autoregressive_profile_trace.json"
 )
 
 TORCH_COMPILE_MODE = "reduce-overhead"
@@ -48,8 +48,8 @@ class Trainer:
     def __init__(
         self,
         general_config: DatasetConfig,
-        model_config: AEConfig | EMConfig,
-        model: Autoencoder | Emulator,
+        model_config: AEConfig | ARConfig,
+        model: Autoencoder | LatentAR,
         optimizer: Optimizer,
         scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
@@ -281,45 +281,45 @@ class AutoencoderTrainer(Trainer):
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}\n")
 
 
-class EmulatorTrainerSequential(Trainer):
-    """Trainer for emulator models using sequential processing."""
+class LatentARTrainerSequential(Trainer):
+    """Trainer for latent autoregressive models using sequential processing."""
 
     def __init__(
         self,
         general_config: DatasetConfig,
         ae_config: AEConfig,
-        em_config: EMConfig,
+        ar_config: ARConfig,
         loss_functions: Loss,
         processing_functions: dp.Processing,
         autoencoder: Autoencoder,
-        emulator: Emulator,
+        latent_ar: LatentAR,
         optimizer: Optimizer,
         scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
         validation_dataloader: DataLoader,
     ) -> None:
-        """Initialize EmulatorTrainerSequential with autoencoder and emulator configs."""
+        """Initialize LatentARTrainerSequential with autoencoder and latent autoregressive configs."""
         self.ae = autoencoder
         self.training_loss = loss_functions.training
         self.validation_loss = loss_functions.validation
         self.latent_dim = ae_config.latent_dim
         self.num_species = general_config.num_species
-        self.gradient_clipping = em_config.gradient_clipping
+        self.gradient_clipping = ar_config.gradient_clipping
         self.inverse_latent_components_scaling = (
             processing_functions.inverse_latent_components_scaling
         )
 
         super().__init__(
             general_config,
-            model_config=em_config,
-            model=emulator,
+            model_config=ar_config,
+            model=latent_ar,
             optimizer=optimizer,
             scheduler=scheduler,
             training_dataloader=training_dataloader,
             validation_dataloader=validation_dataloader,
         )
 
-        self.model = cast(Emulator, torch.compile(self.model, mode=TORCH_COMPILE_MODE))
+        self.model = cast(LatentAR, torch.compile(self.model, mode=TORCH_COMPILE_MODE))
 
     def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
         """Profile a short training run (warmup + first prof_batches) and save a chrome trace."""
@@ -350,20 +350,20 @@ class EmulatorTrainerSequential(Trainer):
             not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
         ):
             os.makedirs(
-                os.path.dirname(EMULATOR_PROFILE_TRACE_PATH) or ".", exist_ok=True
+                os.path.dirname(LATENT_AR_PROFILE_TRACE_PATH) or ".", exist_ok=True
             )
-            p.export_chrome_trace(EMULATOR_PROFILE_TRACE_PATH)
+            p.export_chrome_trace(LATENT_AR_PROFILE_TRACE_PATH)
 
     def train(self) -> None:
         """Just adding a profile epoch before training."""
-        if RUN_EMULATOR_PROFILE_EPOCH:
+        if RUN_LATENT_AR_PROFILE_EPOCH:
             self._profile_epoch()
         super().train()
 
     def _run_training_batch(
         self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
     ) -> None:
-        """Run a single training batch for the emulator."""
+        """Run a single training batch for the latent autoregressive."""
         self.optimizer.zero_grad()
 
         outputs = self.model(phys, features)
@@ -381,7 +381,7 @@ class EmulatorTrainerSequential(Trainer):
     def _run_validation_batch(
         self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
     ) -> None:
-        """Run a single validation batch for the emulator."""
+        """Run a single validation batch for the latent autoregressive."""
         outputs = self.model(phys, features)
 
         outputs = outputs.reshape(-1, self.latent_dim)
@@ -394,7 +394,7 @@ class EmulatorTrainerSequential(Trainer):
         self.epoch_validation_loss += loss.detach()
 
     def _run_epoch(self, epoch: int) -> None:
-        """Run a single epoch of training and validation for the emulator."""
+        """Run a single epoch of training and validation for the latent autoregressive."""
         sampler = cast(DistributedSampler, self.training_dataloader.sampler)
         sampler.set_epoch(epoch)
         tic1 = datetime.now()
@@ -422,7 +422,7 @@ class EmulatorTrainerSequential(Trainer):
 
 
 def load_objects(
-    model: Autoencoder | Emulator, config: AEConfig | EMConfig
+    model: Autoencoder | LatentAR, config: AEConfig | ARConfig
 ) -> Tuple[torch.optim.Optimizer, ReduceLROnPlateau]:
     """Create optimizer and learning rate scheduler for the model."""
     optimizer = optim.AdamW(

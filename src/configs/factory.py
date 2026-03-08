@@ -1,6 +1,6 @@
 """Config builders.
 
-Centralizes dataset-driven configuration selection so AE/EM configs always match
+Centralizes dataset-driven configuration selection so AE/AR configs always match
 the chosen dataset.
 """
 
@@ -10,7 +10,7 @@ from typing import Any
 
 from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DATASET_PRESETS, DatasetConfig, DatasetPreset
-from src.configs.emulator import EMConfig
+from src.configs.latent_autoregressive import ARConfig
 
 
 def get_dataset_preset(dataset_name: str) -> DatasetPreset:
@@ -50,11 +50,11 @@ def build_ae_config(
     return AEConfig(dataset_config=dataset_config, **kwargs)
 
 
-def build_em_config(
+def build_ar_config(
     dataset_config: DatasetConfig,
     ae_config: AEConfig,
     overrides: dict[str, Any] | None = None,
-) -> EMConfig:
+) -> ARConfig:
     preset = get_dataset_preset(dataset_config.dataset_name)
     kwargs = _merged_kwargs(preset.em_kwargs, overrides)
-    return EMConfig(dataset_config=dataset_config, ae_config=ae_config, **kwargs)
+    return ARConfig(dataset_config=dataset_config, ae_config=ae_config, **kwargs)

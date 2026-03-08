@@ -6,9 +6,9 @@ import torch
 
 from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DatasetConfig
-from src.configs.emulator import EMConfig
+from src.configs.latent_autoregressive import ARConfig
 from src.models.autoencoder import Autoencoder, load_autoencoder
-from src.models.emulator import Emulator, load_emulator
+from src.models.latent_autoregressive import LatentAR, load_latent_autoregressive
 
 from . import data_loading as dl
 from . import data_processing as dp
@@ -64,17 +64,17 @@ def benchmark_autoencoder(
     }
 
 
-def benchmark_emulator(
+def benchmark_latent_autoregressive(
     general_config: DatasetConfig,
     ae_config: AEConfig,
-    em_config: EMConfig,
+    ar_config: ARConfig,
 ) -> Dict[str, Any]:
-    """Benchmark emulator prediction accuracy in latent space.
+    """Benchmark latent autoregressive prediction accuracy in latent space.
 
     Args:
         general_config: General configuration for runtime and dataset
         ae_config: Autoencoder model configuration
-        em_config: Emulator model configuration
+        ar_config: LatentAR model configuration
 
     Returns:
         Dictionary containing benchmark metrics:
@@ -89,23 +89,25 @@ def benchmark_emulator(
     )
     inference_functions = Inference(general_config, processing_functions, autoencoder)
 
-    # Load emulator
-    emulator = load_emulator(Emulator, general_config, em_config, inference=True)
+    # Load latent autoregressive
+    latent_ar = load_latent_autoregressive(
+        LatentAR, general_config, ar_config, inference=True
+    )
 
     # Load validation data
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
+    training_np, validation_np = dl.load_datasets(general_config, ar_config.columns)
 
-    # Preprocess for emulator
-    validation_dataset = dp.preprocessing_emulator_dataset(
+    # Preprocess for latent autoregressive
+    validation_dataset = dp.preprocessing_latent_autoregressive_dataset(
         general_config,
-        em_config,
+        ar_config,
         validation_np,
         processing_functions,
         inference_functions,
     )
 
     # Get sequences
-    validation_Dataset = dl.EmulatorSequenceDataset(
+    validation_Dataset = dl.ARSequenceDataset(
         general_config, ae_config, validation_dataset[0], validation_dataset[1]
     )
 
@@ -119,7 +121,7 @@ def benchmark_emulator(
 
     # Run inference
     with torch.no_grad():
-        predicted_latents = emulator(physical_parameters, features)
+        predicted_latents = latent_ar(physical_parameters, features)
 
     # Calculate metrics in latent space
     mse = torch.mean((predicted_latents - targets) ** 2).item()
@@ -135,17 +137,17 @@ def benchmark_emulator(
 def benchmark_combined(
     general_config: DatasetConfig,
     ae_config: AEConfig,
-    em_config: EMConfig,
+    ar_config: ARConfig,
 ) -> Dict[str, Any]:
-    """Benchmark full pipeline: emulator prediction + autoencoder decode.
+    """Benchmark full pipeline: latent autoregressive prediction + autoencoder decode.
 
     This evaluates the end-to-end accuracy of predicting chemical abundances
-    by running the emulator in latent space and decoding back to abundance space.
+    by running the latent autoregressive in latent space and decoding back to abundance space.
 
     Args:
         general_config: General configuration for runtime and dataset
         ae_config: Autoencoder model configuration
-        em_config: Emulator model configuration
+        ar_config: LatentAR model configuration
 
     Returns:
         Dictionary containing benchmark metrics:
@@ -161,23 +163,25 @@ def benchmark_combined(
     )
     inference_functions = Inference(general_config, processing_functions, autoencoder)
 
-    # Load emulator
-    emulator = load_emulator(Emulator, general_config, em_config, inference=True)
+    # Load latent autoregressive
+    latent_ar = load_latent_autoregressive(
+        LatentAR, general_config, ar_config, inference=True
+    )
 
     # Load validation data
-    training_np, validation_np = dl.load_datasets(general_config, em_config.columns)
+    training_np, validation_np = dl.load_datasets(general_config, ar_config.columns)
 
-    # Preprocess for emulator
-    validation_dataset = dp.preprocessing_emulator_dataset(
+    # Preprocess for latent autoregressive
+    validation_dataset = dp.preprocessing_latent_autoregressive_dataset(
         general_config,
-        em_config,
+        ar_config,
         validation_np,
         processing_functions,
         inference_functions,
     )
 
     # Get sequences
-    validation_Dataset = dl.EmulatorSequenceDataset(
+    validation_Dataset = dl.ARSequenceDataset(
         general_config, ae_config, validation_dataset[0], validation_dataset[1]
     )
 
@@ -189,9 +193,9 @@ def benchmark_combined(
     features = features.to(general_config.device)
     targets = targets.to(general_config.device)
 
-    # Run inference: emulator predicts latent, then decode to abundance
+    # Run inference: latent autoregressive predicts latent, then decode to abundance
     with torch.no_grad():
-        predicted_latents = emulator(physical_parameters, features)
+        predicted_latents = latent_ar(physical_parameters, features)
         predicted_latents_scaled = (
             processing_functions.inverse_latent_components_scaling(
                 predicted_latents.reshape(-1, ae_config.latent_dim)
