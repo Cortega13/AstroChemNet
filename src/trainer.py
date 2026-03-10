@@ -35,9 +35,7 @@ torch.autograd.set_detect_anomaly(False)
 
 
 RUN_LATENT_AR_PROFILE_EPOCH = True
-LATENT_AR_PROFILE_TRACE_PATH = (
-    "/work/09338/carlos9/vista/AstroChemNet/outputs/latent_autoregressive_profile_trace.json"
-)
+LATENT_AR_PROFILE_TRACE_PATH = "/work/09338/carlos9/vista/AstroChemNet/outputs/latent_autoregressive_profile_trace.json"
 
 TORCH_COMPILE_MODE = "reduce-overhead"
 
@@ -236,7 +234,9 @@ class AutoencoderTrainer(Trainer):
             validation_dataloader=validation_dataloader,
         )
 
-        self.model = cast(Autoencoder, self.model)
+        self.model = cast(
+            Autoencoder, torch.compile(self.model, mode=TORCH_COMPILE_MODE)
+        )
 
     def _run_training_batch(self, features: torch.Tensor) -> None:
         """Run a training batch where features = targets (autoencoder)."""

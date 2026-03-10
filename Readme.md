@@ -33,29 +33,29 @@ Per dataset, the intended order is:
 ### Preprocess
 
 ```sh
-python3 run.py preprocess uclchem_grav
-python3 run.py preprocess carbox_grav
+python run.py preprocess uclchem_grav
+python run.py preprocess carbox_grav
 ```
 
 Preprocess latent autoregressive sequence artifacts for a chosen dataset:
 
 ```sh
-python3 run.py preprocess latent_autoregressive --dataset-name uclchem_grav
+python run.py preprocess latent_autoregressive --dataset-name uclchem_grav
 python3 run.py preprocess latent_autoregressive --dataset-name carbox_grav
 ```
 
 ### Train
 
 ```sh
-python3 run.py train autoencoder --dataset uclchem_grav
-python3 run.py train latent_autoregressive --dataset uclchem_grav
+python run.py train autoencoder --dataset uclchem_grav
+python run.py train latent_autoregressive --dataset uclchem_grav
 ```
 
 Train (carbox_grav example):
 
 ```sh
-python3 run.py train autoencoder --dataset carbox_grav
-python3 run.py train latent_autoregressive --dataset carbox_grav
+python run.py train autoencoder --dataset carbox_grav
+python run.py train latent_autoregressive --dataset carbox_grav
 ```
 
 ### Benchmark
