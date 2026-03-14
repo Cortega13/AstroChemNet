@@ -5,10 +5,14 @@ from typing import Any, Dict
 import torch
 
 from src.configs.autoencoder import AEConfig
+from src.configs.autoregressive import AutoregressiveConfig
 from src.configs.datasets import DatasetConfig
 from src.configs.latent_autoregressive import ARConfig
+from src.configs.latent_ode import LatentODEConfig
 from src.models.autoencoder import Autoencoder, load_autoencoder
+from src.models.autoregressive import Autoregressive, load_autoregressive
 from src.models.latent_autoregressive import LatentAR, load_latent_autoregressive
+from src.models.latent_ode import LatentODE, load_latent_ode
 
 from . import data_loading as dl
 from . import data_processing as dp
@@ -108,7 +112,7 @@ def benchmark_latent_autoregressive(
 
     # Get sequences
     validation_Dataset = dl.ARSequenceDataset(
-        general_config, ae_config, validation_dataset[0], validation_dataset[1]
+        general_config, validation_dataset[0], validation_dataset[1], ae_config.latent_dim
     )
 
     # Sample a batch for benchmarking
@@ -182,7 +186,7 @@ def benchmark_combined(
 
     # Get sequences
     validation_Dataset = dl.ARSequenceDataset(
-        general_config, ae_config, validation_dataset[0], validation_dataset[1]
+        general_config, validation_dataset[0], validation_dataset[1], ae_config.latent_dim
     )
 
     # Sample a batch for benchmarking
@@ -219,6 +223,125 @@ def benchmark_combined(
     mse = torch.mean((predicted_abundances - target_abundances) ** 2).item()
     mae = torch.mean(torch.abs(predicted_abundances - target_abundances)).item()
     max_error = torch.max(torch.abs(predicted_abundances - target_abundances)).item()
+
+    return {
+        "mse": mse,
+        "mae": mae,
+        "max_error": max_error,
+        "num_samples": predicted_abundances.shape[0],
+    }
+
+
+def benchmark_autoregressive(
+    general_config: DatasetConfig,
+    ar_config: AutoregressiveConfig,
+) -> Dict[str, Any]:
+    """Benchmark abundance autoregressive prediction accuracy in abundance space."""
+    processing_functions = dp.Processing(general_config)
+    autoregressive = load_autoregressive(
+        Autoregressive, general_config, ar_config, inference=True
+    )
+
+    _, validation_np = dl.load_datasets(general_config, ar_config.columns)
+    validation_dataset = dp.preprocessing_autoregressive_dataset(
+        general_config,
+        ar_config,
+        validation_np,
+        processing_functions,
+    )
+    validation_sequence_dataset = dl.AutoregressiveSequenceDataset(
+        general_config,
+        validation_dataset[0],
+        validation_dataset[1],
+    )
+
+    physical_parameters, features, targets = validation_sequence_dataset.__getitems__(
+        list(range(min(1000, len(validation_sequence_dataset))))
+    )
+    physical_parameters = physical_parameters.to(general_config.device)
+    features = features.to(general_config.device)
+    targets = targets.to(general_config.device)
+
+    with torch.no_grad():
+        predicted = autoregressive(physical_parameters, features)
+
+    unscaled_predicted = processing_functions.inverse_abundances_scaling(
+        predicted.reshape(-1, general_config.num_species)
+    )
+    unscaled_targets = processing_functions.inverse_abundances_scaling(
+        targets.reshape(-1, general_config.num_species)
+    )
+
+    mse = torch.mean((unscaled_predicted - unscaled_targets) ** 2).item()
+    mae = torch.mean(torch.abs(unscaled_predicted - unscaled_targets)).item()
+    max_error = torch.max(torch.abs(unscaled_predicted - unscaled_targets)).item()
+
+    return {
+        "mse": mse,
+        "mae": mae,
+        "max_error": max_error,
+        "num_samples": predicted.shape[0],
+    }
+
+
+def benchmark_latent_ode(
+    general_config: DatasetConfig,
+    ae_config: AEConfig,
+    ode_config: LatentODEConfig,
+) -> Dict[str, Any]:
+    """Benchmark latent ODE prediction accuracy in abundance space."""
+    processing_functions = dp.Processing(general_config, ae_config)
+    autoencoder = load_autoencoder(
+        Autoencoder, general_config, ae_config, inference=True
+    )
+    inference_functions = Inference(general_config, processing_functions, autoencoder)
+    latent_ode = load_latent_ode(LatentODE, general_config, ode_config, inference=True)
+
+    training_np, validation_np = dl.load_datasets(general_config, ode_config.columns)
+    base_dt = dp.compute_base_dt(training_np)
+    validation_dataset = dp.preprocessing_latent_ode_dataset(
+        general_config,
+        ode_config,
+        validation_np,
+        processing_functions,
+        inference_functions,
+        base_dt,
+    )
+    validation_sequence_dataset = dl.LatentODESequenceDataset(
+        general_config,
+        validation_dataset[0],
+        validation_dataset[1],
+        validation_dataset[2],
+        ae_config.latent_dim,
+    )
+
+    delta_t, physical_parameters, features, targets = validation_sequence_dataset.__getitems__(
+        list(range(min(512, len(validation_sequence_dataset))))
+    )
+    delta_t = delta_t.to(general_config.device)
+    physical_parameters = physical_parameters.to(general_config.device)
+    features = features.to(general_config.device)
+    targets = targets.to(general_config.device)
+
+    with torch.no_grad():
+        predicted_latents = latent_ode(delta_t, physical_parameters, features)
+        predicted_latents = processing_functions.inverse_latent_components_scaling(
+            predicted_latents.reshape(-1, ae_config.latent_dim)
+        )
+        predicted_abundances = autoencoder.decode(predicted_latents).reshape(
+            targets.shape[0], targets.shape[1], -1
+        )
+
+    unscaled_predicted = processing_functions.inverse_abundances_scaling(
+        predicted_abundances.reshape(-1, general_config.num_species)
+    )
+    unscaled_targets = processing_functions.inverse_abundances_scaling(
+        targets.reshape(-1, general_config.num_species)
+    )
+
+    mse = torch.mean((unscaled_predicted - unscaled_targets) ** 2).item()
+    mae = torch.mean(torch.abs(unscaled_predicted - unscaled_targets)).item()
+    max_error = torch.max(torch.abs(unscaled_predicted - unscaled_targets)).item()
 
     return {
         "mse": mse,

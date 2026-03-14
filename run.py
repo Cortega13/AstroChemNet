@@ -14,13 +14,17 @@ def main() -> None:
     from src.configs.datasets import AVAILABLE_DATASETS
 
     parser = argparse.ArgumentParser(
-        description="ACNN: Autoencoder and Latent Autoregressive Training CLI",
+        description="ACNN: Autoencoder, autoregressive, and latent ODE training CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python run.py train autoencoder     Train the autoencoder model
+  python run.py train autoregressive  Train the abundance autoregressive model
   python run.py train latent_autoregressive        Train the latent autoregressive model
+  python run.py train latent_ode      Train the latent ODE model
   python run.py preprocess uclchem_grav  Preprocess dataset
+  python run.py preprocess latent_ode --dataset-name uclchem_grav
+  python run.py benchmark latent_ode --dataset uclchem_grav
   python run.py benchmark combined    Benchmark full pipeline
         """,
     )
@@ -30,7 +34,7 @@ Examples:
     train_parser = subparsers.add_parser("train", help="Train models")
     train_parser.add_argument(
         "model",
-        choices=["autoencoder", "latent_autoregressive"],
+        choices=["autoencoder", "autoregressive", "latent_autoregressive", "latent_ode"],
         help="Model to train",
     )
     train_parser.add_argument(
@@ -44,7 +48,7 @@ Examples:
     preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
     preprocess_parser.add_argument(
         "dataset",
-        choices=[*AVAILABLE_DATASETS, "latent_autoregressive"],
+        choices=[*AVAILABLE_DATASETS, "autoregressive", "latent_autoregressive", "latent_ode"],
         help="Dataset to preprocess",
     )
     preprocess_parser.add_argument(
@@ -63,7 +67,7 @@ Examples:
     benchmark_parser = subparsers.add_parser("benchmark", help="Benchmark models")
     benchmark_parser.add_argument(
         "model",
-        choices=["autoencoder", "latent_autoregressive", "combined"],
+        choices=["autoencoder", "autoregressive", "latent_autoregressive", "latent_ode", "combined"],
         help="Model to benchmark",
     )
     benchmark_parser.add_argument(

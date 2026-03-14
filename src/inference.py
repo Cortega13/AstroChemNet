@@ -7,7 +7,9 @@ import torch
 
 from src.configs.datasets import DatasetConfig
 from src.models.autoencoder import Autoencoder
+from src.models.autoregressive import Autoregressive
 from src.models.latent_autoregressive import LatentAR
+from src.models.latent_ode import LatentODE
 
 
 class Inference:
@@ -19,11 +21,15 @@ class Inference:
         processing_functions,
         autoencoder: Optional[Autoencoder] = None,
         latent_ar: Optional[LatentAR] = None,
+        latent_ode: Optional[LatentODE] = None,
+        autoregressive: Optional[Autoregressive] = None,
     ) -> None:
         """Initialize Inference with config, processing functions, and models."""
         self.device = general_config.device
         self.autoencoder = autoencoder
         self.latent_ar = latent_ar
+        self.latent_ode = latent_ode
+        self.autoregressive = autoregressive
 
         self.inverse_abundances_scaling = (
             processing_functions.inverse_abundances_scaling
@@ -35,6 +41,7 @@ class Inference:
         self.inverse_latent_components_scaling = (
             processing_functions.inverse_latent_components_scaling
         )
+        self.abundances_scaling = processing_functions.jit_abundances_scaling
 
     def convert_to_tensor(self, inputs) -> torch.Tensor:
         """Convert numpy array or other input to torch tensor on device."""
@@ -88,3 +95,34 @@ class Inference:
         evolved_latents = self.latent_emulate(phys, latents)
         evolved_abundances = self.decode(evolved_latents)
         return evolved_abundances
+
+    def latent_ode_emulate(
+        self, delta_t, phys, abundances, skip_encoder: bool = False
+    ) -> torch.Tensor:
+        """Emulate abundances using the latent ODE and autoencoder."""
+        assert self.autoencoder is not None, "Autoencoder is required for emulation"
+        assert self.latent_ode is not None, "LatentODE is required for emulation"
+        latents = abundances if skip_encoder else self.encode(abundances)
+        scaled_latents = self.latent_components_scaling(self.convert_to_tensor(latents))
+        delta_t = self.convert_to_tensor(delta_t)
+        phys = self.convert_to_tensor(phys)
+        with torch.no_grad():
+            scaled_evolved_latents = self.latent_ode(delta_t, phys, scaled_latents)
+            evolved_latents = self.inverse_latent_components_scaling(
+                scaled_evolved_latents.reshape(-1, scaled_evolved_latents.shape[-1])
+            )
+            evolved_latents = evolved_latents.reshape_as(scaled_evolved_latents)
+            return self.decode(evolved_latents)
+
+    def abundance_emulate(self, phys, abundances, inputs_scaled: bool = True) -> torch.Tensor:
+        """Emulate abundance evolution directly with abundance autoregressive model."""
+        assert (
+            self.autoregressive is not None
+        ), "Autoregressive model is required for direct abundance emulation"
+        with torch.no_grad():
+            phys = self.convert_to_tensor(phys)
+            abundances = self.convert_to_tensor(abundances)
+            if not inputs_scaled:
+                abundances = self.abundances_scaling(abundances)
+            evolved_abundances = self.autoregressive(phys, abundances)
+            return self.inverse_abundances_scaling(evolved_abundances)

@@ -130,6 +130,12 @@ class DatasetPreset:
     # Kwargs applied when building ARConfig(dataset_config=..., ae_config=..., **ar_kwargs)
     em_kwargs: dict[str, Any] = field(default_factory=dict)
 
+    # Kwargs applied when building LatentODEConfig(dataset_config=..., ae_config=..., **kwargs)
+    latent_ode_kwargs: dict[str, Any] = field(default_factory=dict)
+
+    # Kwargs applied when building AutoregressiveConfig(dataset_config=..., **kwargs)
+    autoregressive_kwargs: dict[str, Any] = field(default_factory=dict)
+
 
 # Central registry used by src/configs/factory.py builders.
 DATASET_PRESETS: dict[str, DatasetPreset] = {

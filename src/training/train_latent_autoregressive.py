@@ -33,10 +33,10 @@ def main(
     )
 
     training_Dataset = dl.ARSequenceDataset(
-        general_config, ae_config, training_dataset, training_indices
+        general_config, training_dataset, training_indices, ae_config.latent_dim
     )
     validation_Dataset = dl.ARSequenceDataset(
-        general_config, ae_config, validation_dataset, validation_indices
+        general_config, validation_dataset, validation_indices, ae_config.latent_dim
     )
     del training_dataset, validation_dataset, training_indices, validation_indices
 
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     # Instantiate configs - GeneralConfig loads from preprocessing output
     from src.configs.factory import (
         build_ae_config,
-        build_dataset_config,
         build_ar_config,
+        build_dataset_config,
     )
 
     general_config = build_dataset_config("uclchem_grav")

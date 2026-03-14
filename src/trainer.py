@@ -1,4 +1,4 @@
-"""Trainer classes for autoencoder and latent autoregressive models."""
+"""Trainer classes for autoencoder and autoregressive models."""
 
 import copy
 import gc
@@ -19,10 +19,14 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from src.configs.autoencoder import AEConfig
+from src.configs.autoregressive import AutoregressiveConfig
 from src.configs.datasets import DatasetConfig
 from src.configs.latent_autoregressive import ARConfig
+from src.configs.latent_ode import LatentODEConfig
 from src.models.autoencoder import Autoencoder
+from src.models.autoregressive import Autoregressive
 from src.models.latent_autoregressive import LatentAR
+from src.models.latent_ode import LatentODE
 
 from . import data_processing as dp
 from .loss import Loss
@@ -36,6 +40,9 @@ torch.autograd.set_detect_anomaly(False)
 
 RUN_LATENT_AR_PROFILE_EPOCH = True
 LATENT_AR_PROFILE_TRACE_PATH = "/work/09338/carlos9/vista/AstroChemNet/outputs/latent_autoregressive_profile_trace.json"
+AUTOREGRESSIVE_PROFILE_TRACE_PATH = (
+    "/work/09338/carlos9/vista/AstroChemNet/outputs/autoregressive_profile_trace.json"
+)
 
 TORCH_COMPILE_MODE = "reduce-overhead"
 
@@ -46,8 +53,8 @@ class Trainer:
     def __init__(
         self,
         general_config: DatasetConfig,
-        model_config: AEConfig | ARConfig,
-        model: Autoencoder | LatentAR,
+        model_config: AEConfig | ARConfig | AutoregressiveConfig | LatentODEConfig,
+        model: Autoencoder | LatentAR | Autoregressive | LatentODE,
         optimizer: Optimizer,
         scheduler: ReduceLROnPlateau,
         training_dataloader: DataLoader,
@@ -421,8 +428,238 @@ class LatentARTrainerSequential(Trainer):
         print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")
 
 
+class AutoregressiveTrainerSequential(Trainer):
+    """Trainer for abundance autoregressive models using sequential processing."""
+
+    def __init__(
+        self,
+        general_config: DatasetConfig,
+        ar_config: AutoregressiveConfig,
+        loss_functions: Loss,
+        autoregressive: Autoregressive,
+        optimizer: Optimizer,
+        scheduler: ReduceLROnPlateau,
+        training_dataloader: DataLoader,
+        validation_dataloader: DataLoader,
+    ) -> None:
+        """Initialize trainer for abundance autoregressive model."""
+        self.training_loss = loss_functions.training
+        self.validation_loss = loss_functions.validation
+        self.gradient_clipping = ar_config.gradient_clipping
+
+        super().__init__(
+            general_config,
+            model_config=ar_config,
+            model=autoregressive,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            training_dataloader=training_dataloader,
+            validation_dataloader=validation_dataloader,
+        )
+
+        self.model = cast(
+            Autoregressive, torch.compile(self.model, mode=TORCH_COMPILE_MODE)
+        )
+
+    def _profile_epoch(self, warmup_batches: int = 3, prof_batches: int = 1) -> None:
+        """Profile a short training run and save a chrome trace."""
+        self.model.train()
+        iterator = iter(self.training_dataloader)
+        for _ in range(warmup_batches):
+            phys, features, targets = next(iterator)
+            self._run_training_batch(
+                phys.to(self.device, non_blocking=True),
+                features.to(self.device, non_blocking=True),
+                targets.to(self.device, non_blocking=True),
+            )
+
+        activities = [torch.profiler.ProfilerActivity.CPU] + (
+            [torch.profiler.ProfilerActivity.CUDA] if str(self.device) == "cuda" else []
+        )
+        with torch.profiler.profile(activities=activities) as profiler:
+            for _ in range(prof_batches):
+                phys, features, targets = next(iterator)
+                self._run_training_batch(
+                    phys.to(self.device, non_blocking=True),
+                    features.to(self.device, non_blocking=True),
+                    targets.to(self.device, non_blocking=True),
+                )
+                profiler.step()
+
+        if str(self.device) == "cuda":
+            torch.cuda.synchronize()
+        if not torch.distributed.is_available() or (
+            not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
+        ):
+            os.makedirs(
+                os.path.dirname(AUTOREGRESSIVE_PROFILE_TRACE_PATH) or ".",
+                exist_ok=True,
+            )
+            profiler.export_chrome_trace(AUTOREGRESSIVE_PROFILE_TRACE_PATH)
+
+    def train(self) -> None:
+        """Just adding a profile epoch before training."""
+        if RUN_LATENT_AR_PROFILE_EPOCH:
+            self._profile_epoch()
+        super().train()
+
+    def _run_training_batch(
+        self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
+    ) -> None:
+        """Run a single training batch for the abundance autoregressive."""
+        self.optimizer.zero_grad()
+
+        outputs = self.model(phys, features)
+        outputs = outputs.reshape(-1, outputs.shape[-1])
+        targets = targets.reshape(-1, targets.shape[-1])
+
+        loss = self.training_loss(outputs, targets)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
+        self.optimizer.step()
+
+    def _run_validation_batch(
+        self, phys: torch.Tensor, features: torch.Tensor, targets: torch.Tensor
+    ) -> None:
+        """Run a single validation batch for the abundance autoregressive."""
+        outputs = self.model(phys, features)
+        loss = self.validation_loss(outputs, targets).mean(dim=0)
+        self.epoch_validation_loss += loss.detach()
+
+    def _run_epoch(self, epoch: int) -> None:
+        """Run a single epoch of training and validation for the autoregressive."""
+        sampler = cast(DistributedSampler, self.training_dataloader.sampler)
+        sampler.set_epoch(epoch)
+        tic1 = datetime.now()
+
+        self.model.train()
+        for phys, features, targets in self.training_dataloader:
+            phys = phys.to(self.device, non_blocking=True)
+            features = features.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
+            self._run_training_batch(phys, features, targets)
+
+        tic2 = datetime.now()
+
+        self.model.eval()
+        with torch.no_grad():
+            for phys, features, targets in self.validation_dataloader:
+                phys = phys.to(self.device, non_blocking=True)
+                features = features.to(self.device, non_blocking=True)
+                targets = targets.to(self.device, non_blocking=True)
+                self._run_validation_batch(phys, features, targets)
+
+        toc = datetime.now()
+        print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")
+
+
+class LatentODETrainerSequential(Trainer):
+    """Trainer for latent ODE models using full-window rollout."""
+
+    def __init__(
+        self,
+        general_config: DatasetConfig,
+        ae_config: AEConfig,
+        ode_config: LatentODEConfig,
+        loss_functions: Loss,
+        processing_functions: dp.Processing,
+        autoencoder: Autoencoder,
+        latent_ode: LatentODE,
+        optimizer: Optimizer,
+        scheduler: ReduceLROnPlateau,
+        training_dataloader: DataLoader,
+        validation_dataloader: DataLoader,
+    ) -> None:
+        """Initialize trainer for latent ODE model."""
+        self.ae = autoencoder
+        self.training_loss = loss_functions.training
+        self.validation_loss = loss_functions.validation
+        self.latent_dim = ae_config.latent_dim
+        self.num_species = general_config.num_species
+        self.gradient_clipping = ode_config.gradient_clipping
+        self.inverse_latent_components_scaling = (
+            processing_functions.inverse_latent_components_scaling
+        )
+
+        super().__init__(
+            general_config,
+            model_config=ode_config,
+            model=latent_ode,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            training_dataloader=training_dataloader,
+            validation_dataloader=validation_dataloader,
+        )
+
+    def _run_training_batch(
+        self,
+        delta_t: torch.Tensor,
+        phys: torch.Tensor,
+        features: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> None:
+        """Run one training batch for the latent ODE model."""
+        self.optimizer.zero_grad()
+        outputs = self.model(delta_t, phys, features)
+        outputs = outputs.reshape(-1, self.latent_dim)
+        outputs = self.inverse_latent_components_scaling(outputs)
+        outputs = self.ae.decode(outputs)
+        targets = targets.reshape(-1, self.num_species)
+
+        loss = self.training_loss(outputs, targets)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clipping)
+        self.optimizer.step()
+
+    def _run_validation_batch(
+        self,
+        delta_t: torch.Tensor,
+        phys: torch.Tensor,
+        features: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> None:
+        """Run one validation batch for the latent ODE model."""
+        outputs = self.model(delta_t, phys, features)
+        outputs = outputs.reshape(-1, self.latent_dim)
+        outputs = self.inverse_latent_components_scaling(outputs)
+        outputs = self.ae.decode(outputs)
+        outputs = outputs.reshape(targets.size(0), targets.size(1), -1)
+
+        loss = self.validation_loss(outputs, targets).mean(dim=0)
+        self.epoch_validation_loss += loss.detach()
+
+    def _run_epoch(self, epoch: int) -> None:
+        """Run a full training/validation epoch for latent ODE."""
+        sampler = cast(DistributedSampler, self.training_dataloader.sampler)
+        sampler.set_epoch(epoch)
+        tic1 = datetime.now()
+
+        self.model.train()
+        for delta_t, phys, features, targets in self.training_dataloader:
+            delta_t = delta_t.to(self.device, non_blocking=True)
+            phys = phys.to(self.device, non_blocking=True)
+            features = features.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
+            self._run_training_batch(delta_t, phys, features, targets)
+
+        tic2 = datetime.now()
+
+        self.model.eval()
+        with torch.no_grad():
+            for delta_t, phys, features, targets in self.validation_dataloader:
+                delta_t = delta_t.to(self.device, non_blocking=True)
+                phys = phys.to(self.device, non_blocking=True)
+                features = features.to(self.device, non_blocking=True)
+                targets = targets.to(self.device, non_blocking=True)
+                self._run_validation_batch(delta_t, phys, features, targets)
+
+        toc = datetime.now()
+        print(f"Training Time: {tic2 - tic1} | Validation Time: {toc - tic2}")
+
+
 def load_objects(
-    model: Autoencoder | LatentAR, config: AEConfig | ARConfig
+    model: Autoencoder | LatentAR | Autoregressive | LatentODE,
+    config: AEConfig | ARConfig | AutoregressiveConfig | LatentODEConfig,
 ) -> Tuple[torch.optim.Optimizer, ReduceLROnPlateau]:
     """Create optimizer and learning rate scheduler for the model."""
     optimizer = optim.AdamW(

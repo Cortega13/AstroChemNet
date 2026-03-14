@@ -28,7 +28,7 @@ python -m pip install -r requirements.txt
 
 Per dataset, the intended order is:
 
-1. preprocess dataset → 2) train autoencoder → 3) preprocess latent autoregressive sequences → 4) train latent autoregressive → 5) benchmark
+1. preprocess dataset → 2) train autoencoder and/or preprocess sequence artifacts → 3) train autoregressive and/or latent models → 4) benchmark
 
 ### Preprocess
 
@@ -40,29 +40,39 @@ python run.py preprocess carbox_grav
 Preprocess latent autoregressive sequence artifacts for a chosen dataset:
 
 ```sh
+python run.py preprocess autoregressive --dataset-name uclchem_grav
+python3 run.py preprocess autoregressive --dataset-name carbox_grav
 python run.py preprocess latent_autoregressive --dataset-name uclchem_grav
 python3 run.py preprocess latent_autoregressive --dataset-name carbox_grav
+python run.py preprocess latent_ode --dataset-name uclchem_grav
+python3 run.py preprocess latent_ode --dataset-name carbox_grav
 ```
 
 ### Train
 
 ```sh
 python run.py train autoencoder --dataset uclchem_grav
+python run.py train autoregressive --dataset uclchem_grav
 python run.py train latent_autoregressive --dataset uclchem_grav
+python run.py train latent_ode --dataset uclchem_grav
 ```
 
 Train (carbox_grav example):
 
 ```sh
 python run.py train autoencoder --dataset carbox_grav
+python run.py train autoregressive --dataset carbox_grav
 python run.py train latent_autoregressive --dataset carbox_grav
+python run.py train latent_ode --dataset carbox_grav
 ```
 
 ### Benchmark
 
 ```sh
 python3 run.py benchmark autoencoder --dataset uclchem_grav
+python3 run.py benchmark autoregressive --dataset uclchem_grav
 python3 run.py benchmark latent_autoregressive --dataset uclchem_grav
+python3 run.py benchmark latent_ode --dataset uclchem_grav
 python3 run.py benchmark combined --dataset uclchem_grav
 ```
 
@@ -78,8 +88,12 @@ Dataset selection is the runtime switch that determines which AE/AR kwargs are a
 - Preprocessing artifacts: `outputs/preprocessed/<dataset_name>/`
 - Model weights (dataset-scoped): `outputs/weights/<dataset_name>/`
   - autoencoder: `autoencoder.pth`
+  - autoregressive: `autoregressive.pth`
   - latent autoregressive: `latent_autoregressive.pth`
+  - latent ODE: `latent_ode.pth`
+- Autoregressive sequence caches: `outputs/preprocessed/<dataset_name>/autoregressive/*.h5`
 - LatentAR sequence caches: `outputs/preprocessed/<dataset_name>/latent_autoregressive/*.h5`
+- LatentODE sequence caches: `outputs/preprocessed/<dataset_name>/latent_ode/*.h5`
 
 ## Gravitational Collapse Benchmark
 

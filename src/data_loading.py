@@ -3,14 +3,13 @@
 import gc
 import json
 import os
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import h5py
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from src.configs.autoencoder import AEConfig
 from src.configs.datasets import DatasetConfig
 
 
@@ -69,11 +68,12 @@ def save_tensors_to_hdf5(
     general_config: DatasetConfig,
     tensors: Tuple[torch.Tensor, torch.Tensor],
     category: str,
+    artifact_dir: str = "latent_autoregressive",
 ) -> None:
     """Save dataset and indices tensors to HDF5 file for quick loading."""
     dataset, indices = tensors
     dataset_path = os.path.join(
-        general_config.preprocessing_dir, "latent_autoregressive", f"{category}.h5"
+        general_config.preprocessing_dir, artifact_dir, f"{category}.h5"
     )
     os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
     with h5py.File(dataset_path, "w") as f:
@@ -82,11 +82,13 @@ def save_tensors_to_hdf5(
 
 
 def load_tensors_from_hdf5(
-    general_config: DatasetConfig, category: str
+    general_config: DatasetConfig,
+    category: str,
+    artifact_dir: str = "latent_autoregressive",
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load saved dataset and indices tensors from HDF5 file."""
     dataset_path = os.path.join(
-        general_config.preprocessing_dir, "latent_autoregressive", f"{category}.h5"
+        general_config.preprocessing_dir, artifact_dir, f"{category}.h5"
     )
     with h5py.File(dataset_path, "r") as f:
         dataset = f["dataset"][:]  # type:ignore
@@ -94,6 +96,42 @@ def load_tensors_from_hdf5(
     dataset = torch.from_numpy(dataset).float()
     indices = torch.from_numpy(indices).int()
     return dataset, indices
+
+
+def save_named_tensors_to_hdf5(
+    general_config: DatasetConfig,
+    tensors: Dict[str, torch.Tensor],
+    category: str,
+    artifact_dir: str,
+) -> None:
+    """Save a dictionary of tensors to HDF5."""
+    dataset_path = os.path.join(
+        general_config.preprocessing_dir, artifact_dir, f"{category}.h5"
+    )
+    os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
+    with h5py.File(dataset_path, "w") as f:
+        for name, tensor in tensors.items():
+            dtype = (
+                np.int32 if tensor.dtype in (torch.int32, torch.int64) else np.float32
+            )
+            f.create_dataset(name, data=tensor.cpu().numpy(), dtype=dtype)
+
+
+def load_named_tensors_from_hdf5(
+    general_config: DatasetConfig,
+    category: str,
+    artifact_dir: str,
+) -> Dict[str, torch.Tensor]:
+    """Load a dictionary of tensors from HDF5."""
+    dataset_path = os.path.join(
+        general_config.preprocessing_dir, artifact_dir, f"{category}.h5"
+    )
+    outputs: Dict[str, torch.Tensor] = {}
+    with h5py.File(dataset_path, "r") as f:
+        for key in f.keys():
+            tensor = torch.from_numpy(f[key][:])
+            outputs[key] = tensor.int() if key == "indices" else tensor.float()
+    return outputs
 
 
 class ChunkedShuffleSampler(Sampler):
@@ -168,9 +206,9 @@ class ARSequenceDataset(Dataset):
     def __init__(
         self,
         general_config: DatasetConfig,
-        ae_config: AEConfig,
         data_matrix: torch.Tensor,
         data_indices: torch.Tensor,
+        num_latents: int,
     ) -> None:
         """Initialize the latent autoregressive dataset with data matrix and indices."""
         self.device = general_config.device
@@ -180,7 +218,7 @@ class ARSequenceDataset(Dataset):
         self.num_metadata = general_config.num_metadata
         self.num_phys = general_config.num_phys
         self.num_species = general_config.num_species
-        self.num_latents = ae_config.latent_dim
+        self.num_latents = num_latents
 
         data_matrix_size = self.data_matrix.nbytes / (1024**2)
         indices_matrix_size = self.data_indices.nbytes / (1024**2)
@@ -215,8 +253,108 @@ class ARSequenceDataset(Dataset):
         return physical_parameters, features, targets
 
 
+class AutoregressiveSequenceDataset(Dataset):
+    """Tensor dataset for abundance autoregressive training."""
+
+    def __init__(
+        self,
+        general_config: DatasetConfig,
+        data_matrix: torch.Tensor,
+        data_indices: torch.Tensor,
+    ) -> None:
+        """Initialize abundance autoregressive dataset with sequence indices."""
+        self.device = general_config.device
+        self.data_matrix = data_matrix.contiguous()
+        self.data_indices = data_indices.contiguous()
+        self.num_datapoints = len(data_indices)
+        self.num_metadata = general_config.num_metadata
+        self.num_phys = general_config.num_phys
+
+        data_matrix_size = self.data_matrix.nbytes / (1024**2)
+        indices_matrix_size = self.data_indices.nbytes / (1024**2)
+
+        print(f"Data_matrix Memory usage: {data_matrix_size:.3f} MB")
+        print(f"Indices_matrix Memory usage: {indices_matrix_size:.3f} MB")
+        print(f"Dataset Size: {len(data_indices)}\n")
+
+    def __len__(self) -> int:
+        """Return the number of datapoints in the dataset."""
+        return self.num_datapoints
+
+    def __getitems__(
+        self, indices: List[int]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Load multiple abundance sequence samples at once for batch retrieval."""
+        indices_tensor = torch.tensor(indices, dtype=torch.long)
+        data_indices = self.data_indices[indices_tensor]
+        rows = self.data_matrix[data_indices]
+
+        physical_parameters = rows[
+            :, :-1, self.num_metadata : self.num_metadata + self.num_phys
+        ].contiguous()
+        features = rows[:, 0, self.num_metadata + self.num_phys :].contiguous()
+        targets = rows[:, 1:, self.num_metadata + self.num_phys :].contiguous()
+
+        return physical_parameters, features, targets
+
+
+class LatentODESequenceDataset(Dataset):
+    """Tensor dataset for latent ODE training with interval durations."""
+
+    def __init__(
+        self,
+        general_config: DatasetConfig,
+        data_matrix: torch.Tensor,
+        data_indices: torch.Tensor,
+        delta_t: torch.Tensor,
+        num_latents: int,
+    ) -> None:
+        """Initialize the latent ODE dataset with latent windows and time deltas."""
+        self.data_matrix = data_matrix.contiguous()
+        self.data_indices = data_indices.contiguous()
+        self.delta_t = delta_t.contiguous()
+        self.num_datapoints = len(data_indices)
+        self.num_metadata = general_config.num_metadata
+        self.num_phys = general_config.num_phys
+        self.num_latents = num_latents
+
+        data_matrix_size = self.data_matrix.nbytes / (1024**2)
+        indices_matrix_size = self.data_indices.nbytes / (1024**2)
+        delta_t_size = self.delta_t.nbytes / (1024**2)
+
+        print(f"Data_matrix Memory usage: {data_matrix_size:.3f} MB")
+        print(f"Indices_matrix Memory usage: {indices_matrix_size:.3f} MB")
+        print(f"Delta_t Memory usage: {delta_t_size:.3f} MB")
+        print(f"Dataset Size: {len(data_indices)}\n")
+
+    def __len__(self) -> int:
+        """Return the number of datapoints in the dataset."""
+        return self.num_datapoints
+
+    def __getitems__(
+        self, indices: List[int]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Load multiple latent ODE windows for batch retrieval."""
+        indices_tensor = torch.tensor(indices, dtype=torch.long)
+        data_indices = self.data_indices[indices_tensor]
+        rows = self.data_matrix[data_indices]
+
+        delta_t = self.delta_t[indices_tensor].contiguous()
+        physical_parameters = rows[
+            :, :-1, self.num_metadata : self.num_metadata + self.num_phys
+        ].contiguous()
+        features = rows[:, 0, -self.num_latents :].contiguous()
+        targets = rows[
+            :, 1:, self.num_metadata + self.num_phys : -self.num_latents
+        ].contiguous()
+        return delta_t, physical_parameters, features, targets
+
+
 def collate_function(batch):
     """Collate function that handles features, targets, and optional physical parameters."""
+    if len(batch) == 4:
+        delta_t, physical_parameters, features, targets = batch
+        return delta_t, physical_parameters, features, targets
     if len(batch) == 2:
         features, targets = batch
         return features, targets

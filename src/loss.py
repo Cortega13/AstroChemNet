@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import torch
 
 from src.configs.autoencoder import AEConfig
+from src.configs.autoregressive import AutoregressiveConfig
 from src.configs.datasets import DatasetConfig
 from src.configs.latent_autoregressive import ARConfig
 from src.data_processing import Processing
@@ -18,7 +19,7 @@ class Loss:
         self,
         processing_functions: Processing,
         general_config: DatasetConfig,
-        ModelConfig: Optional[AEConfig | ARConfig] = None,
+        ModelConfig: Optional[AEConfig | ARConfig | AutoregressiveConfig] = None,
     ) -> None:
         """Initialize Loss with processing functions and configuration."""
         device = general_config.device
