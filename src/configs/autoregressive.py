@@ -21,7 +21,7 @@ class AutoregressiveConfig:
     save_model_path: str = field(init=False)
 
     # Model architecture
-    hidden_dim: int = 180
+    hidden_dim: int = 80
     window_size: int = 240
 
     # Hyperparameters

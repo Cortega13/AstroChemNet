@@ -22,13 +22,13 @@ class LatentODEConfig:
     save_model_path: str = field(init=False)
     base_dt_path: str = field(init=False)
 
-    hidden_dim: int = 192
+    hidden_dim: int = 80
     num_hidden_layers: int = 2
     window_size: int = 240
 
     method: str = "dopri5"
-    rtol: float = 1e-4
-    atol: float = 1e-6
+    rtol: float = 1e-3
+    atol: float = 1e-4
     solver_substeps: int = 4
     adjoint: bool = False
 
