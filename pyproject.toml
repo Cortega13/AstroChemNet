@@ -6,9 +6,10 @@ build-backend = "setuptools.build_meta"
 extend-include = ["*.ipynb"]
 fix = true
 show-fixes = true
+target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "D"]
+select = ["E", "F", "I", "D", "UP"]
 ignore = ["E501", "D105", "D107", "F401"]
 
 [tool.ruff.lint.per-file-ignores]

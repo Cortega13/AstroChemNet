@@ -1,4 +1,4 @@
-"""Main entry point for training, preprocessing, and benchmarking."""
+"""Main entry point for training, dataset preprocessing, and benchmarking."""
 
 import argparse
 import sys
@@ -11,7 +11,8 @@ sys.path.insert(0, str(project_root))
 
 def main() -> None:
     """Main CLI entry point."""
-    from src.configs.datasets import AVAILABLE_DATASETS
+    from src.datasets import AVAILABLE_DATASETS, DatasetName
+    from src.models import AVAILABLE_BENCHMARK_MODELS, AVAILABLE_MODELS
 
     parser = argparse.ArgumentParser(
         description="ACNN: Autoencoder, autoregressive, and latent ODE training CLI",
@@ -21,9 +22,13 @@ Examples:
   python run.py train autoencoder     Train the autoencoder model
   python run.py train autoregressive  Train the abundance autoregressive model
   python run.py train latent_autoregressive        Train the latent autoregressive model
+  python run.py train latent_rnn      Train the latent RNN model
+  python run.py train latent_neural_operator       Train the latent neural operator
   python run.py train latent_ode      Train the latent ODE model
-  python run.py preprocess uclchem_grav  Preprocess dataset
-  python run.py preprocess latent_ode --dataset-name uclchem_grav
+  python run.py preprocess uclchem_grav  Preprocess dataset artifacts
+  python run.py preprocess uclchem_grav --max-rows 5000
+  python run.py benchmark latent_rnn --dataset uclchem_grav
+  python run.py benchmark latent_neural_operator --dataset uclchem_grav
   python run.py benchmark latent_ode --dataset uclchem_grav
   python run.py benchmark combined    Benchmark full pipeline
         """,
@@ -34,45 +39,53 @@ Examples:
     train_parser = subparsers.add_parser("train", help="Train models")
     train_parser.add_argument(
         "model",
-        choices=["autoencoder", "autoregressive", "latent_autoregressive", "latent_ode"],
+        choices=AVAILABLE_MODELS,
         help="Model to train",
     )
     train_parser.add_argument(
         "--dataset",
-        default="uclchem_grav",
+        default=DatasetName.UCLCHEM_GRAV,
         choices=AVAILABLE_DATASETS,
         help="Dataset to use for training",
     )
+    train_parser.add_argument(
+        "--force-preprocess",
+        action="store_true",
+        help="Refresh preprocessing artifacts before training",
+    )
 
     # Preprocess subcommand
-    preprocess_parser = subparsers.add_parser("preprocess", help="Run preprocessing")
-    preprocess_parser.add_argument(
-        "dataset",
-        choices=[*AVAILABLE_DATASETS, "autoregressive", "latent_autoregressive", "latent_ode"],
-        help="Dataset to preprocess",
+    preprocess_parser = subparsers.add_parser(
+        "preprocess",
+        help="Run dataset preprocessing",
     )
     preprocess_parser.add_argument(
-        "--dataset-name",
-        default="uclchem_grav",
+        "dataset",
         choices=AVAILABLE_DATASETS,
-        help="Dataset to use when preprocessing latent autoregressive sequences",
+        help="Dataset to preprocess",
     )
     preprocess_parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing preprocessing output",
     )
+    preprocess_parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        help="Cap base dataset preprocessing to the first N rows",
+    )
 
     # Benchmark subcommand
     benchmark_parser = subparsers.add_parser("benchmark", help="Benchmark models")
     benchmark_parser.add_argument(
         "model",
-        choices=["autoencoder", "autoregressive", "latent_autoregressive", "latent_ode", "combined"],
+        choices=AVAILABLE_BENCHMARK_MODELS,
         help="Model to benchmark",
     )
     benchmark_parser.add_argument(
         "--dataset",
-        default="uclchem_grav",
+        default=DatasetName.UCLCHEM_GRAV,
         choices=AVAILABLE_DATASETS,
         help="Dataset to use for benchmarking",
     )
@@ -80,13 +93,19 @@ Examples:
     args = parser.parse_args()
 
     # Import handlers after path is set up
-    from src.cli import handle_benchmark, handle_preprocess, handle_train
+    from src import handle_benchmark, handle_preprocess, handle_train
 
     if args.command == "train":
-        handle_train(args.model, dataset_name=args.dataset)
+        handle_train(
+            args.model,
+            dataset_name=args.dataset,
+            force_preprocess=args.force_preprocess,
+        )
     elif args.command == "preprocess":
         handle_preprocess(
-            args.dataset, force=args.force, dataset_name=args.dataset_name
+            args.dataset,
+            force=args.force,
+            max_rows=args.max_rows,
         )
     elif args.command == "benchmark":
         handle_benchmark(args.model, dataset_name=args.dataset)
