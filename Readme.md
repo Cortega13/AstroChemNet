@@ -28,25 +28,23 @@ python -m pip install -r requirements.txt
 
 Per dataset, the intended order is:
 
-1. preprocess dataset → 2) train autoencoder and/or preprocess sequence artifacts → 3) train autoregressive and/or latent models → 4) benchmark
+1. preprocess dataset once if needed → 2) train models → 3) benchmark
+
+Training now auto-checks preprocessing artifacts.
+If the required cached artifacts already exist, training reuses them.
+If they are missing, training builds them automatically.
+Use `--force-preprocess` to refresh cached artifacts before training.
 
 ### Preprocess
 
 ```sh
 python run.py preprocess uclchem_grav
+python run.py preprocess uclchem_grav --max-rows 5000
 python run.py preprocess carbox_grav
 ```
 
-Preprocess latent autoregressive sequence artifacts for a chosen dataset:
-
-```sh
-python run.py preprocess autoregressive --dataset-name uclchem_grav
-python3 run.py preprocess autoregressive --dataset-name carbox_grav
-python run.py preprocess latent_autoregressive --dataset-name uclchem_grav
-python3 run.py preprocess latent_autoregressive --dataset-name carbox_grav
-python run.py preprocess latent_ode --dataset-name uclchem_grav
-python3 run.py preprocess latent_ode --dataset-name carbox_grav
-```
+Use `preprocess` for dataset-level artifacts only.
+Model-level cached artifacts are created automatically by `train`.
 
 ### Train
 
@@ -54,7 +52,16 @@ python3 run.py preprocess latent_ode --dataset-name carbox_grav
 python run.py train autoencoder --dataset uclchem_grav
 python run.py train autoregressive --dataset uclchem_grav
 python run.py train latent_autoregressive --dataset uclchem_grav
+python run.py train latent_rnn --dataset uclchem_grav
+python run.py train latent_neural_operator --dataset uclchem_grav
 python run.py train latent_ode --dataset uclchem_grav
+```
+
+Force preprocessing refresh before training:
+
+```sh
+python run.py train autoencoder --dataset uclchem_grav --force-preprocess
+python run.py train latent_ode --dataset carbox_grav --force-preprocess
 ```
 
 Train (carbox_grav example):
@@ -63,6 +70,8 @@ Train (carbox_grav example):
 python run.py train autoencoder --dataset carbox_grav
 python run.py train autoregressive --dataset carbox_grav
 python run.py train latent_autoregressive --dataset carbox_grav
+python run.py train latent_rnn --dataset carbox_grav
+python run.py train latent_neural_operator --dataset carbox_grav
 python run.py train latent_ode --dataset carbox_grav
 ```
 
@@ -72,16 +81,39 @@ python run.py train latent_ode --dataset carbox_grav
 python3 run.py benchmark autoencoder --dataset uclchem_grav
 python3 run.py benchmark autoregressive --dataset uclchem_grav
 python3 run.py benchmark latent_autoregressive --dataset uclchem_grav
+python3 run.py benchmark latent_rnn --dataset uclchem_grav
+python3 run.py benchmark latent_neural_operator --dataset uclchem_grav
 python3 run.py benchmark latent_ode --dataset uclchem_grav
 python3 run.py benchmark combined --dataset uclchem_grav
 ```
 
 ### Dataset-specific configs
 
-Dataset selection is the runtime switch that determines which AE/AR kwargs are applied.
+Dataset selection is the runtime switch that determines which AE/AR/latent-model kwargs are applied.
 
-- registry: [`DATASET_PRESETS`](src/configs/datasets.py:135) in [`src/configs/datasets.py`](src/configs/datasets.py:1)
-- builders: [`build_ae_config()`](src/configs/factory.py:44) / [`build_ar_config()`](src/configs/factory.py:53) in [`src/configs/factory.py`](src/configs/factory.py:1)
+- shared config API: [`src/datasets/__init__.py`](src/datasets/__init__.py:1)
+- dataset builder: [`build_dataset_config()`](src/datasets/__init__.py:1)
+- model config builder: [`build_model_config()`](src/models/__init__.py:1)
+- dataset config only holds dataset-specific values
+- model configs now live beside each model in `src/models/*/config.py`
+
+### Code layout
+
+The repo is now organized primarily by model:
+
+- shared training exports: [`src/training.py`](src/training.py:1)
+- model registry and CLI dispatch: [`src/models/__init__.py`](src/models/__init__.py:1), [`src/__init__.py`](src/__init__.py:1)
+- shared dataset/config helpers: [`src/datasets/__init__.py`](src/datasets/__init__.py:1), [`src/models/__init__.py`](src/models/__init__.py:1)
+- per-model code:
+  - [`src/models/autoencoder/`](src/models/autoencoder)
+  - [`src/models/autoregressive/`](src/models/autoregressive)
+  - [`src/models/latent_autoregressive/`](src/models/latent_autoregressive)
+  - [`src/models/latent_rnn/`](src/models/latent_rnn)
+  - [`src/models/latent_neural_operator/`](src/models/latent_neural_operator)
+  - [`src/models/latent_ode/`](src/models/latent_ode)
+
+Each model folder contains its own `model.py`, `config.py`, `train.py`, and `benchmark.py`.
+Models that need cached sequence artifacts keep the preprocessing logic in `preprocess.py`, and `train.py` calls `ensure_preprocessed(...)` automatically before loading caches.
 
 ### Artifact locations
 
@@ -90,10 +122,14 @@ Dataset selection is the runtime switch that determines which AE/AR kwargs are a
   - autoencoder: `autoencoder.pth`
   - autoregressive: `autoregressive.pth`
   - latent autoregressive: `latent_autoregressive.pth`
+  - latent RNN: `latent_rnn.pth`
+  - latent neural operator: `latent_neural_operator.pth`
   - latent ODE: `latent_ode.pth`
-- Autoregressive sequence caches: `outputs/preprocessed/<dataset_name>/autoregressive/*.h5`
-- LatentAR sequence caches: `outputs/preprocessed/<dataset_name>/latent_autoregressive/*.h5`
-- LatentODE sequence caches: `outputs/preprocessed/<dataset_name>/latent_ode/*.h5`
+- Autoregressive sequence caches: `outputs/preprocessed/<dataset_name>/autoregressive/*.pt`
+- LatentAR sequence caches: `outputs/preprocessed/<dataset_name>/latent_autoregressive/*.pt`
+- LatentRNN sequence caches: `outputs/preprocessed/<dataset_name>/latent_rnn/*.pt`
+- Latent neural operator sequence caches: `outputs/preprocessed/<dataset_name>/latent_neural_operator/*.pt`
+- LatentODE sequence caches: `outputs/preprocessed/<dataset_name>/latent_ode/*.pt`
 
 ## Gravitational Collapse Benchmark
 

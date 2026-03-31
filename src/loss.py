@@ -1,15 +1,12 @@
 """Loss functions for autoencoder and latent autoregressive training."""
 
 from collections.abc import Callable
-from typing import Optional, Tuple
+from typing import Any
 
 import torch
 
-from src.configs.autoencoder import AEConfig
-from src.configs.autoregressive import AutoregressiveConfig
-from src.configs.datasets import DatasetConfig
-from src.configs.latent_autoregressive import ARConfig
 from src.data_processing import Processing
+from src.datasets import DatasetConfig
 
 
 class Loss:
@@ -19,7 +16,7 @@ class Loss:
         self,
         processing_functions: Processing,
         general_config: DatasetConfig,
-        ModelConfig: Optional[AEConfig | ARConfig | AutoregressiveConfig] = None,
+        ModelConfig: Any,
     ) -> None:
         """Initialize Loss with processing functions and configuration."""
         device = general_config.device
@@ -31,14 +28,12 @@ class Loss:
         self.inverse_abundances_scaling: Callable[[torch.Tensor], torch.Tensor] = (
             processing_functions.inverse_abundances_scaling
         )
-
-        if ModelConfig:
-            self.power_weight = torch.tensor(
-                ModelConfig.power_weight, dtype=torch.float32, device=device
-            )
-            self.conservation_weight = torch.tensor(
-                ModelConfig.conservation_weight, dtype=torch.float32, device=device
-            )
+        self.power_weight = torch.tensor(
+            ModelConfig.power_weight, dtype=torch.float32, device=device
+        )
+        self.conservation_weight = torch.tensor(
+            ModelConfig.conservation_weight, dtype=torch.float32, device=device
+        )
 
     @staticmethod
     def elementwise_loss(
@@ -46,9 +41,9 @@ class Loss:
         targets: torch.Tensor,
         exponential: torch.Tensor,
         power_weight: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Calculate elementwise exponential loss with mean and worst case."""
-        elementwise_loss = torch.abs(outputs - targets)
+        elementwise_loss = torch.abs(outputs - targets) ** 2
         elementwise_loss = torch.exp(power_weight * exponential * elementwise_loss) - 1
 
         mean_loss = torch.sum(elementwise_loss) / targets.size(0)
@@ -98,9 +93,6 @@ class Loss:
         # combine everything
         total_loss = 1e-3 * (mean_loss + alpha * worst_loss + conservation_error)
 
-        # NOTE: Per-batch printing of CUDA tensors forces host synchronization (implicit
-        # tensor->scalar conversion during formatting) and can dominate runtime on fast GPUs.
-        # If you need logging, do it less frequently and move values to CPU explicitly.
         # print(
         #     f"Recon: {mean_loss.detach():.3e} | Worst: {worst_loss.detach():.3e} "
         #     f"| Cons: {conservation_error.detach():.3e} | Total: {total_loss.detach():.3e}"

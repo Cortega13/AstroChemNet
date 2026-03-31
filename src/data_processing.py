@@ -1,25 +1,19 @@
-"""Data processing functions for preprocessing and postprocessing data scaling."""
+"""Shared scaling and processing helpers."""
 
-import gc
-from typing import Optional, Tuple, Union, overload
+from typing import overload
 
 import numpy as np
 import torch
-from numba import njit
 
-from src.configs.autoencoder import AEConfig
-from src.configs.autoregressive import AutoregressiveConfig
-from src.configs.datasets import DatasetConfig
-from src.configs.latent_autoregressive import ARConfig
-
-from .inference import Inference
+from src.datasets import DatasetConfig
+from src.models.autoencoder.config import AEConfig
 
 
 class Processing:
     """Group of preprocessing and postprocessing functions for data scaling."""
 
     def __init__(
-        self, general_config: DatasetConfig, ae_config: Optional[AEConfig] = None
+        self, general_config: DatasetConfig, ae_config: AEConfig | None = None
     ) -> None:
         self.device = general_config.device
         self.exponential = torch.log(torch.tensor(10, device=self.device).float())
@@ -125,8 +119,8 @@ class Processing:
     def inverse_abundances_scaling(self, abundances: np.ndarray) -> None: ...
 
     def inverse_abundances_scaling(
-        self, abundances: Union[torch.Tensor, np.ndarray]
-    ) -> Optional[torch.Tensor]:
+        self, abundances: torch.Tensor | np.ndarray
+    ) -> torch.Tensor | None:
         """Reverse minmax scaling of abundances for torch or numpy arrays."""
         if isinstance(abundances, torch.Tensor):
             return self.jit_inverse_abundances_scaling(
@@ -161,175 +155,3 @@ class Processing:
         return self.jit_inverse_latent_component_scaling(
             scaled_components, self.components_min, self.components_max
         )
-
-
-@njit
-def calculate_autoregressive_indices(
-    dataset_np: np.ndarray,
-    window_size: int = 16,
-) -> np.ndarray:
-    """Generate indices for autoregressive training sequences with overlapping windows."""
-    change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
-    model_groups = np.split(dataset_np, change_indices)
-
-    total_seqs = 0
-    for group in model_groups:
-        n = len(group)
-        total_seqs += n - window_size + 1
-
-    sequences = np.full((total_seqs, window_size), -1, dtype=np.int32)
-
-    seq_idx = 0
-    for group in model_groups:
-        indices = group[:, 0]
-        n = len(indices)
-        for start_idx in range(n - window_size + 1):
-            sequences[seq_idx, :] = indices[start_idx : start_idx + window_size]
-            seq_idx += 1
-
-    return sequences
-
-
-def calculate_latent_autoregressive_indices(
-    dataset_np: np.ndarray,
-    window_size: int = 16,
-) -> np.ndarray:
-    """Backward-compatible wrapper for latent autoregressive index generation."""
-    return calculate_autoregressive_indices(dataset_np, window_size)
-
-
-def compute_base_dt(dataset_np: np.ndarray) -> float:
-    """Compute the dataset base observation interval from model time deltas."""
-    change_indices = np.where(np.diff(dataset_np[:, 1].astype(np.int32)) != 0)[0] + 1
-    model_groups = np.split(dataset_np, change_indices)
-    deltas = []
-    for group in model_groups:
-        if len(group) < 2:
-            continue
-        diffs = np.diff(group[:, 2])
-        positive = diffs[diffs > 0]
-        if positive.size:
-            deltas.append(positive)
-
-    if not deltas:
-        raise ValueError("Unable to compute a positive base time interval from dataset.")
-
-    return float(np.median(np.concatenate(deltas)))
-
-
-def preprocessing_latent_autoregressive_dataset(
-    general_config: DatasetConfig,
-    ar_config: ARConfig,
-    dataset_np: np.ndarray,
-    processing_functions: Processing,
-    inference_functions: Inference,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Preprocess dataset for latent autoregressive training with indices and latent components."""
-    num_species = general_config.num_species
-    num_phys = general_config.num_phys
-    num_metadata = general_config.num_metadata
-
-    dataset_np[:, 0] = np.arange(len(dataset_np))
-
-    processing_functions.physical_parameter_scaling(
-        dataset_np[:, num_metadata : num_metadata + num_phys]
-    )
-    processing_functions.abundances_scaling(dataset_np[:, -num_species:])
-
-    latent_components = inference_functions.encode(
-        dataset_np[:, num_metadata + num_phys :]
-    )
-    latent_components = (
-        processing_functions.latent_components_scaling(latent_components).cpu().numpy()
-    )
-    encoded_dataset_np = np.hstack((dataset_np, latent_components), dtype=np.float32)
-
-    index_pairs_np = calculate_latent_autoregressive_indices(
-        encoded_dataset_np, ar_config.window_size
-    )
-
-    perm = np.random.permutation(len(index_pairs_np))
-    index_pairs_shuffled_np = index_pairs_np[perm]
-
-    encoded_t = torch.from_numpy(encoded_dataset_np).float()
-    index_pairs_shuffled_t = torch.from_numpy(index_pairs_shuffled_np).int()
-
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    return (encoded_t, index_pairs_shuffled_t)
-
-
-def preprocessing_latent_ode_dataset(
-    general_config: DatasetConfig,
-    ode_config,
-    dataset_np: np.ndarray,
-    processing_functions: Processing,
-    inference_functions: Inference,
-    base_dt: float,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Preprocess dataset for latent ODE training with interval lengths."""
-    num_species = general_config.num_species
-    num_phys = general_config.num_phys
-    num_metadata = general_config.num_metadata
-
-    dataset_np[:, 0] = np.arange(len(dataset_np))
-
-    processing_functions.physical_parameter_scaling(
-        dataset_np[:, num_metadata : num_metadata + num_phys]
-    )
-    processing_functions.abundances_scaling(dataset_np[:, -num_species:])
-
-    latent_components = inference_functions.encode(
-        dataset_np[:, num_metadata + num_phys :]
-    )
-    latent_components = (
-        processing_functions.latent_components_scaling(latent_components).cpu().numpy()
-    )
-    encoded_dataset_np = np.hstack((dataset_np, latent_components), dtype=np.float32)
-
-    index_pairs_np = calculate_latent_autoregressive_indices(
-        encoded_dataset_np, ode_config.window_size
-    )
-    times_np = encoded_dataset_np[index_pairs_np, 2]
-    delta_t_np = np.diff(times_np, axis=1).astype(np.float32) / np.float32(base_dt)
-
-    perm = np.random.permutation(len(index_pairs_np))
-    encoded_t = torch.from_numpy(encoded_dataset_np).float()
-    index_pairs_shuffled_t = torch.from_numpy(index_pairs_np[perm]).int()
-    delta_t_shuffled_t = torch.from_numpy(delta_t_np[perm]).float()
-
-    gc.collect()
-    torch.cuda.empty_cache()
-    return encoded_t, index_pairs_shuffled_t, delta_t_shuffled_t
-
-
-def preprocessing_autoregressive_dataset(
-    general_config: DatasetConfig,
-    ar_config: AutoregressiveConfig,
-    dataset_np: np.ndarray,
-    processing_functions: Processing,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Preprocess dataset for abundance autoregressive training."""
-    num_species = general_config.num_species
-    num_phys = general_config.num_phys
-    num_metadata = general_config.num_metadata
-
-    dataset_np[:, 0] = np.arange(len(dataset_np))
-
-    processing_functions.physical_parameter_scaling(
-        dataset_np[:, num_metadata : num_metadata + num_phys]
-    )
-    processing_functions.abundances_scaling(dataset_np[:, -num_species:])
-
-    index_pairs_np = calculate_autoregressive_indices(dataset_np, ar_config.window_size)
-    perm = np.random.permutation(len(index_pairs_np))
-    index_pairs_shuffled_np = index_pairs_np[perm]
-
-    dataset_t = torch.from_numpy(dataset_np).float()
-    index_pairs_shuffled_t = torch.from_numpy(index_pairs_shuffled_np).int()
-
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    return (dataset_t, index_pairs_shuffled_t)
