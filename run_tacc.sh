@@ -10,5 +10,5 @@
 
 module load gcc
 module load python3_mpi/3.11.8
-source /work/09338/carlos9/vista/AstroChemNet/.venv/bin/activate
+source /work/09338/carlos9/vista/AstroChemNet/venv/bin/activate
 python run.py train latent_ode --dataset uclchem_grav
