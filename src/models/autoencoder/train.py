@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from src import data_processing as dp
+from src import ensure_dataset_preprocessed
 from src.data_loading import load_datasets, tensor_to_dataloader
 from src.datasets import DatasetConfig
 from src.loss import Loss
@@ -112,8 +113,9 @@ def save_latents_minmax(
     np.save(ae_config.latents_minmax_path, minmax_np)
 
 
-def train(dataset_config) -> None:
+def train(dataset_config, force_preprocess: bool = False) -> None:
     """Train autoencoder model with given configuration."""
+    ensure_dataset_preprocessed(dataset_config.name, force=force_preprocess)
     ae_config = build_config(dataset_config)
     processing_functions = dp.Processing(dataset_config)
 

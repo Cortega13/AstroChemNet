@@ -8,7 +8,6 @@ from src.datasets import (
     get_preprocessor,
     list_available_datasets,
 )
-from src.models import MODEL_REGISTRY, ModelName
 
 
 def ensure_dataset_preprocessed(
@@ -30,11 +29,13 @@ def ensure_dataset_preprocessed(
 
 
 def handle_train(
-    model: str | ModelName,
+    model: str,
     dataset_name: str | DatasetName = DatasetName.UCLCHEM_GRAV,
     force_preprocess: bool = False,
 ) -> None:
     """Handle train command for a model and dataset."""
+    from src.models import MODEL_REGISTRY, ModelName
+
     model = ModelName(model)
     ensure_dataset_preprocessed(dataset_name, force=force_preprocess)
     dataset_config = build_dataset_config(dataset_name)
@@ -63,16 +64,27 @@ def handle_preprocess(
 
 
 def handle_benchmark(
-    model: str | ModelName,
+    model: str,
     dataset_name: str | DatasetName = DatasetName.UCLCHEM_GRAV,
 ) -> None:
     """Handle benchmark command for model evaluation."""
+    from src.models import MODEL_REGISTRY, ModelName
+
     model = ModelName(model)
     ensure_dataset_preprocessed(dataset_name)
     dataset_config = build_dataset_config(dataset_name)
     print(f"Benchmarking {model}...")
     results = MODEL_REGISTRY[model].benchmark(dataset_config)
     print(f"{model} Results: {results}")
+
+
+def __getattr__(name: str):
+    """Lazily expose model registry objects from src.models."""
+    if name == "MODEL_REGISTRY":
+        from src.models import MODEL_REGISTRY
+
+        return MODEL_REGISTRY
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
