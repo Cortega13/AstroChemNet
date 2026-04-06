@@ -20,8 +20,8 @@ def preprocess_dataset(
     general_config,
     model_config,
     dataset_np: np.ndarray,
-    processing_functions,
-    inference_functions,
+    processing_functions: dp.Processing,
+    inference_functions: Inference,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Preprocess dataset for latent sequence training."""
     num_species = general_config.num_species

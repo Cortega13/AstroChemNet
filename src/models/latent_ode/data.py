@@ -11,11 +11,12 @@ from torch.utils.data import Dataset
 
 from src import data_processing as dp
 from src.data_loading import load_datasets, save_tensors
+from src.datasets import DatasetConfig
 from src.models.autoencoder.config import build_config as build_ae_config
 from src.models.autoencoder.inference import Inference
 from src.models.autoencoder.model import Autoencoder, load_autoencoder
 from src.models.autoregressive.data import calculate_indices
-from src.models.latent_ode.config import build_config
+from src.models.latent_ode.config import LatentODEConfig, build_config
 
 
 def compute_base_dt(dataset_np: np.ndarray) -> float:
@@ -45,11 +46,11 @@ def save_base_dt(path: str, base_dt: float) -> None:
 
 
 def preprocess_dataset(
-    general_config,
-    ode_config,
+    general_config: DatasetConfig,
+    ode_config: LatentODEConfig,
     dataset_np: np.ndarray,
-    processing_functions,
-    inference_functions,
+    processing_functions: dp.Processing,
+    inference_functions: Inference,
     base_dt: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Preprocess dataset for latent ODE training with interval lengths."""
@@ -141,15 +142,13 @@ def preprocess_latent_ode(
     save_base_dt(model_config.base_dt_path, base_dt)
 
 
-def artifact_paths(dataset_config) -> tuple[Path, Path]:
-    """Return latent ODE cache paths."""
-    artifact_dir = Path(dataset_config.preprocessing_dir) / "latent_ode"
-    return artifact_dir / "training_seq.pt", artifact_dir / "validation_seq.pt"
-
-
 def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     """Build latent ODE caches when missing or forced."""
-    training_path, validation_path = artifact_paths(dataset_config)
+    artifact_dir = Path(dataset_config.preprocessing_dir) / "latent_ode"
+    training_path, validation_path = (
+        artifact_dir / "training_seq.pt",
+        artifact_dir / "validation_seq.pt",
+    )
     if not force and training_path.exists() and validation_path.exists():
         return
     ae_config = build_ae_config(dataset_config)

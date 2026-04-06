@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 
+from src.data_processing import Processing
 from src.datasets import DatasetConfig
 from src.models.autoencoder.model import Autoencoder
 
@@ -15,7 +16,7 @@ class Inference:
     def __init__(
         self,
         general_config: DatasetConfig,
-        processing_functions: object,
+        processing_functions: Processing,
         model: Autoencoder,
     ) -> None:
         """Store shared inference dependencies."""
