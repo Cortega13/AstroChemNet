@@ -6,7 +6,7 @@ import torch
 from src.datasets import DatasetConfig
 from src.models.autoencoder.model import Autoencoder
 
-type TensorLike = np.ndarray | torch.Tensor
+TensorLike = np.ndarray | torch.Tensor
 
 
 class Inference:
