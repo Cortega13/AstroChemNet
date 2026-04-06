@@ -1,5 +1,6 @@
 """Autoencoder training entrypoint."""
 
+import os
 from datetime import datetime
 from typing import cast
 
@@ -110,12 +111,13 @@ def save_latents_minmax(
 
     minmax_np = np.array([min_, max_], dtype=np.float32)
     print(f"Latents MinMax: {minmax_np[0]}, {minmax_np[1]}")
+    os.makedirs(os.path.dirname(ae_config.latents_minmax_path) or ".", exist_ok=True)
     np.save(ae_config.latents_minmax_path, minmax_np)
 
 
 def train(dataset_config, force_preprocess: bool = False) -> None:
     """Train autoencoder model with given configuration."""
-    ensure_dataset_preprocessed(dataset_config.name, force=force_preprocess)
+    ensure_dataset_preprocessed(dataset_config.dataset_name, force=force_preprocess)
     ae_config = build_config(dataset_config)
     processing_functions = dp.Processing(dataset_config)
 

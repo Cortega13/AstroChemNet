@@ -68,6 +68,7 @@ class Trainer:
     def save_loss_per_epoch(self) -> None:
         """Save the loss per epoch to a JSON file."""
         epochs_path = os.path.splitext(self.model_config.save_model_path)[0] + ".json"
+        os.makedirs(os.path.dirname(epochs_path) or ".", exist_ok=True)
         with open(epochs_path, "w") as f:
             json.dump(self.loss_per_epoch, f, indent=4)
 
@@ -80,9 +81,11 @@ class Trainer:
 
     def _save_checkpoint(self) -> None:
         """Save the model's state dictionary to a file."""
-        checkpoint = self.model.state_dict()
+        model = getattr(self.model, "_orig_mod", self.model)
+        checkpoint = model.state_dict()
         model_path = os.path.join(self.model_config.save_model_path)
         if self.model_config.save_model:
+            os.makedirs(os.path.dirname(model_path) or ".", exist_ok=True)
             torch.save(checkpoint, model_path)
 
     def set_dropout_rate(self, dropout_rate: float) -> None:
