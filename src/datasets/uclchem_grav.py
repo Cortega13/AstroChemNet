@@ -3,7 +3,7 @@
 import json
 import math
 import os
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import torch
@@ -33,7 +33,7 @@ def round_up_sigfigs(value: float, sig_figs: int = 2) -> float:
     return rounded * magnitude
 
 
-seed = 42
+seed = 13
 torch.manual_seed(seed)
 np.random.seed(seed)
 
