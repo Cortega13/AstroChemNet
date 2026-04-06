@@ -1,7 +1,7 @@
 """Autoregressive data helpers."""
 
 import gc
-from pathlib import Path
+import os
 
 import numpy as np
 import torch
@@ -81,28 +81,23 @@ def preprocess_autoregressive(dataset_config, model_config) -> None:
     )
     save_tensors(
         dataset_config,
+        "autoregressive",
         {"dataset": training_dataset[0], "indices": training_dataset[1]},
         category="training_seq",
-        artifact_dir="autoregressive",
     )
     save_tensors(
         dataset_config,
+        "autoregressive",
         {"dataset": validation_dataset[0], "indices": validation_dataset[1]},
         category="validation_seq",
-        artifact_dir="autoregressive",
     )
-
-
-def artifact_paths(dataset_config) -> tuple[Path, Path]:
-    """Return autoregressive cache paths."""
-    artifact_dir = Path(dataset_config.preprocessing_dir) / "autoregressive"
-    return artifact_dir / "training_seq.pt", artifact_dir / "validation_seq.pt"
 
 
 def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     """Build autoregressive caches when missing or forced."""
-    training_path, validation_path = artifact_paths(dataset_config)
-    if not force and training_path.exists() and validation_path.exists():
+    training_path = dataset_config.model_path("autoregressive", "training_seq.pt")
+    validation_path = dataset_config.model_path("autoregressive", "validation_seq.pt")
+    if not force and os.path.exists(training_path) and os.path.exists(validation_path):
         return
     preprocess_autoregressive(dataset_config, build_config(dataset_config))
 

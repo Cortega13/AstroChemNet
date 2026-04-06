@@ -116,13 +116,13 @@ def train(dataset_config, force_preprocess: bool = False) -> None:
     model_config = build_config(dataset_config, ae_config)
     training_tensors = load_tensors(
         dataset_config,
+        "latent_rnn",
         category="training_seq",
-        artifact_dir="latent_rnn",
     )
     validation_tensors = load_tensors(
         dataset_config,
+        "latent_rnn",
         category="validation_seq",
-        artifact_dir="latent_rnn",
     )
     training_dataset = training_tensors["dataset"]
     training_indices = training_tensors["indices"]

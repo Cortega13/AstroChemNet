@@ -35,8 +35,8 @@ def load_datasets(
     col_indices = [columns_mapping[col] for col in columns]
 
     # Load full datasets from .npy files
-    train_full = np.load(os.path.join(general_config.dataset_path, "train.npy"))
-    val_full = np.load(os.path.join(general_config.dataset_path, "val.npy"))
+    train_full = np.load(os.path.join(general_config.dataset_artifacts_dir, "train.npy"))
+    val_full = np.load(os.path.join(general_config.dataset_artifacts_dir, "val.npy"))
 
     # Select only requested columns
     training_np = train_full[:, col_indices].astype(np.float32)
@@ -64,31 +64,23 @@ def load_datasets(
 
 def save_tensors(
     general_config: DatasetConfig,
+    model_name: str,
     tensors: dict[str, torch.Tensor],
     category: str,
-    artifact_dir: str = "latent_autoregressive",
 ) -> None:
     """Save tensors to a .pt file."""
-    dataset_path = os.path.join(
-        general_config.preprocessing_dir,
-        artifact_dir,
-        f"{category}.pt",
-    )
+    dataset_path = general_config.model_path(model_name, f"{category}.pt")
     os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
     torch.save({name: tensor.cpu() for name, tensor in tensors.items()}, dataset_path)
 
 
 def load_tensors(
     general_config: DatasetConfig,
+    model_name: str,
     category: str,
-    artifact_dir: str = "latent_autoregressive",
 ) -> dict[str, torch.Tensor]:
     """Load tensors from a .pt file."""
-    dataset_path = os.path.join(
-        general_config.preprocessing_dir,
-        artifact_dir,
-        f"{category}.pt",
-    )
+    dataset_path = general_config.model_path(model_name, f"{category}.pt")
     return torch.load(dataset_path, map_location="cpu", weights_only=True)
 
 

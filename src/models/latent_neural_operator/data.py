@@ -1,6 +1,6 @@
 """Latent neural operator data helpers."""
 
-from pathlib import Path
+import os
 
 from src import data_processing as dp
 from src.data_loading import load_datasets, save_tensors
@@ -46,28 +46,23 @@ def preprocess_latent_neural_operator(
     )
     save_tensors(
         dataset_config,
+        "latent_neural_operator",
         {"dataset": training_dataset[0], "indices": training_dataset[1]},
         category="training_seq",
-        artifact_dir="latent_neural_operator",
     )
     save_tensors(
         dataset_config,
+        "latent_neural_operator",
         {"dataset": validation_dataset[0], "indices": validation_dataset[1]},
         category="validation_seq",
-        artifact_dir="latent_neural_operator",
     )
-
-
-def artifact_paths(dataset_config) -> tuple[Path, Path]:
-    """Return latent neural operator cache paths."""
-    artifact_dir = Path(dataset_config.preprocessing_dir) / "latent_neural_operator"
-    return artifact_dir / "training_seq.pt", artifact_dir / "validation_seq.pt"
 
 
 def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     """Build latent neural operator caches when missing or forced."""
-    training_path, validation_path = artifact_paths(dataset_config)
-    if not force and training_path.exists() and validation_path.exists():
+    training_path = dataset_config.model_path("latent_neural_operator", "training_seq.pt")
+    validation_path = dataset_config.model_path("latent_neural_operator", "validation_seq.pt")
+    if not force and os.path.exists(training_path) and os.path.exists(validation_path):
         return
     ae_config = build_ae_config(dataset_config)
     preprocess_latent_neural_operator(
@@ -78,4 +73,4 @@ def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     )
 
 
-__all__ = ["LatentSequenceDataset", "artifact_paths", "ensure_preprocessed", "preprocess_dataset"]
+__all__ = ["LatentSequenceDataset", "ensure_preprocessed", "preprocess_dataset"]

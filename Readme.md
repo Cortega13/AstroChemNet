@@ -117,19 +117,14 @@ Models that need cached sequence artifacts keep the preprocessing logic in `prep
 
 ### Artifact locations
 
-- Preprocessing artifacts: `outputs/preprocessed/<dataset_name>/`
-- Model weights (dataset-scoped): `outputs/weights/<dataset_name>/`
-  - autoencoder: `autoencoder.pth`
-  - autoregressive: `autoregressive.pth`
-  - latent autoregressive: `latent_autoregressive.pth`
-  - latent RNN: `latent_rnn.pth`
-  - latent neural operator: `latent_neural_operator.pth`
-  - latent ODE: `latent_ode.pth`
-- Autoregressive sequence caches: `outputs/preprocessed/<dataset_name>/autoregressive/*.pt`
-- LatentAR sequence caches: `outputs/preprocessed/<dataset_name>/latent_autoregressive/*.pt`
-- LatentRNN sequence caches: `outputs/preprocessed/<dataset_name>/latent_rnn/*.pt`
-- Latent neural operator sequence caches: `outputs/preprocessed/<dataset_name>/latent_neural_operator/*.pt`
-- LatentODE sequence caches: `outputs/preprocessed/<dataset_name>/latent_ode/*.pt`
+- Dataset artifacts: `outputs/<dataset_name>/dataset/`
+- Model artifacts: `outputs/<dataset_name>/models/<model_name>/`
+- Examples:
+  - autoencoder weights: `outputs/<dataset_name>/models/autoencoder/model.pth`
+  - autoencoder latent scaling: `outputs/<dataset_name>/models/autoencoder/latents_minmax.npy`
+  - autoregressive sequence tensors: `outputs/<dataset_name>/models/autoregressive/training_seq.pt`
+  - latent RNN sequence tensors: `outputs/<dataset_name>/models/latent_rnn/validation_seq.pt`
+  - latent ODE base dt: `outputs/<dataset_name>/models/latent_ode/base_dt.json`
 
 ## Gravitational Collapse Benchmark
 

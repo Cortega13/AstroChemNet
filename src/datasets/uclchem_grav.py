@@ -48,7 +48,7 @@ def get_output_dir(project_root: str, dataset_name: str) -> str:
     Returns:
         Path to the preprocessing output directory
     """
-    return os.path.join(project_root, "outputs", "preprocessed", dataset_name)
+    return os.path.join(project_root, "outputs", dataset_name, "dataset")
 
 
 def save_metadata(

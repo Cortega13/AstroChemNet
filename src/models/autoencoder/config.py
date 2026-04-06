@@ -1,6 +1,5 @@
 """Configuration dataclass for autoencoder model."""
 
-import os
 from dataclasses import dataclass, field
 
 from src.datasets import DatasetConfig, DatasetName
@@ -18,7 +17,6 @@ class AEConfig:
     latents_minmax_path: str = field(init=False)
     pretrained_model_path: str = field(init=False)
     save_model_path: str = field(init=False)
-    artifact_name: str = "autoencoder"
 
     hidden_dims: tuple[int, ...] = (160, 80)
     latent_dim: int = 14
@@ -45,22 +43,13 @@ class AEConfig:
         self.columns = self.dataset_config.species
         self.num_columns = len(self.columns)
         self.input_dim = self.dataset_config.num_species
-        self.latents_minmax_path = os.path.join(
-            self.dataset_config.preprocessing_dir,
-            f"{self.artifact_name}_latents_minmax.npy",
+        self.latents_minmax_path = self.dataset_config.model_path(
+            "autoencoder", "latents_minmax.npy"
         )
-        self.pretrained_model_path = os.path.join(
-            self.dataset_config.weights_dir,
-            f"{self.artifact_name}.pth",
+        self.pretrained_model_path = self.dataset_config.model_path(
+            "autoencoder", "model.pth"
         )
         self.save_model_path = self.pretrained_model_path
-
-
-@dataclass
-class UCLCHEMAEConfig(AEConfig):
-    """Autoencoder configuration for UCLCHEM."""
-
-    artifact_name: str = "autoencoder_uclchem"
 
 
 @dataclass
@@ -73,7 +62,7 @@ class CarboxAEConfig(AEConfig):
 
 
 AE_CONFIGS: dict[DatasetName, type[AEConfig]] = {
-    DatasetName.UCLCHEM_GRAV: UCLCHEMAEConfig,
+    DatasetName.UCLCHEM_GRAV: AEConfig,
     DatasetName.CARBOX_GRAV: CarboxAEConfig,
 }
 

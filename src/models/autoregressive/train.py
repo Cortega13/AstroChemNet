@@ -160,13 +160,13 @@ def train(dataset_config, force_preprocess: bool = False) -> None:
     ar_config = build_config(dataset_config)
     training_tensors = load_tensors(
         dataset_config,
+        "autoregressive",
         category="training_seq",
-        artifact_dir="autoregressive",
     )
     validation_tensors = load_tensors(
         dataset_config,
+        "autoregressive",
         category="validation_seq",
-        artifact_dir="autoregressive",
     )
     training_dataset = training_tensors["dataset"]
     training_indices = training_tensors["indices"]

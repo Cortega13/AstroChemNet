@@ -18,8 +18,7 @@ def ensure_dataset_preprocessed(
 ) -> None:
     """Build dataset preprocessing artifacts when missing or forced."""
     dataset_name = DatasetName(dataset_name)
-    outputs_dir = Path(__file__).resolve().parents[1] / "outputs" / "preprocessed"
-    species_path = outputs_dir / dataset_name / "species.json"
+    species_path = Path(__file__).resolve().parents[1] / "outputs" / dataset_name / "dataset" / "species.json"
     if not force and species_path.exists():
         return
     preprocessor = get_preprocessor(dataset_name)

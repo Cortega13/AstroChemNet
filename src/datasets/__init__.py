@@ -26,10 +26,10 @@ class DatasetConfig:
     abundances_lower_clipping: np.float32 = np.float32(1e-20)
     abundances_upper_clipping: np.float32 = np.float32(1)
     metadata: list[str] = field(default_factory=lambda: ["Index", "Model", "Time"])
-    preprocessing_dir: str = field(init=False)
-    dataset_path: str = field(init=False)
+    outputs_dir: str = field(init=False)
+    dataset_artifacts_dir: str = field(init=False)
+    models_dir: str = field(init=False)
     columns_mapping_path: str = field(init=False)
-    weights_dir: str = field(init=False)
     physical_parameter_ranges: dict[str, tuple[float, float]] = field(init=False)
     stoichiometric_matrix: np.ndarray = field(init=False)
     species: list[str] = field(init=False)
@@ -39,16 +39,11 @@ class DatasetConfig:
     num_species: int = field(init=False)
 
     def __post_init__(self) -> None:
-        """Load configuration from preprocessing output."""
-        self.preprocessing_dir = os.path.join(
-            self.project_root, "outputs", "preprocessed", self.dataset_name
-        )
-        self.weights_dir = os.path.join(
-            self.project_root, "outputs", "weights", self.dataset_name
-        )
-        os.makedirs(self.weights_dir, exist_ok=True)
-        self.dataset_path = self.preprocessing_dir
-        columns_in_output = os.path.join(self.preprocessing_dir, "columns.json")
+        """Load configuration from dataset output."""
+        self.outputs_dir = os.path.join(self.project_root, "outputs", self.dataset_name)
+        self.dataset_artifacts_dir = os.path.join(self.outputs_dir, "dataset")
+        self.models_dir = os.path.join(self.outputs_dir, "models")
+        columns_in_output = os.path.join(self.dataset_artifacts_dir, "columns.json")
         self.columns_mapping_path = (
             columns_in_output
             if os.path.exists(columns_in_output)
@@ -57,12 +52,12 @@ class DatasetConfig:
             )
         )
         self.physical_parameter_ranges = self._load_physical_parameter_ranges()
-        species_path = os.path.join(self.preprocessing_dir, "species.json")
+        species_path = os.path.join(self.dataset_artifacts_dir, "species.json")
         with open(species_path) as f:
             species_data = json.load(f)
         self.species = species_data["species"]
         stoichiometric_matrix_path = os.path.join(
-            self.preprocessing_dir, "stoichiometric_matrix.npy"
+            self.dataset_artifacts_dir, "stoichiometric_matrix.npy"
         )
         self.stoichiometric_matrix = np.load(stoichiometric_matrix_path)
         self.phys = list(self.physical_parameter_ranges.keys())
@@ -70,10 +65,18 @@ class DatasetConfig:
         self.num_phys = len(self.phys)
         self.num_species = len(self.species)
 
+    def model_dir(self, model_name: str) -> str:
+        """Return the directory for one model."""
+        return os.path.join(self.models_dir, model_name)
+
+    def model_path(self, model_name: str, filename: str) -> str:
+        """Return the path for one model artifact."""
+        return os.path.join(self.model_dir(model_name), filename)
+
     def _load_physical_parameter_ranges(self) -> dict[str, tuple[float, float]]:
         """Load physical parameter ranges from preprocessing output."""
         ranges_path = os.path.join(
-            self.preprocessing_dir, "physical_parameter_ranges.json"
+            self.dataset_artifacts_dir, "physical_parameter_ranges.json"
         )
         with open(ranges_path) as f:
             ranges_data = json.load(f)

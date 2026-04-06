@@ -3,7 +3,6 @@
 import gc
 import json
 import os
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -121,35 +120,32 @@ def preprocess_latent_ode(
     )
     save_tensors(
         dataset_config,
+        "latent_ode",
         {
             "dataset": training_dataset[0],
             "indices": training_dataset[1],
             "delta_t": training_dataset[2],
         },
         category="training_seq",
-        artifact_dir="latent_ode",
     )
     save_tensors(
         dataset_config,
+        "latent_ode",
         {
             "dataset": validation_dataset[0],
             "indices": validation_dataset[1],
             "delta_t": validation_dataset[2],
         },
         category="validation_seq",
-        artifact_dir="latent_ode",
     )
     save_base_dt(model_config.base_dt_path, base_dt)
 
 
 def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     """Build latent ODE caches when missing or forced."""
-    artifact_dir = Path(dataset_config.preprocessing_dir) / "latent_ode"
-    training_path, validation_path = (
-        artifact_dir / "training_seq.pt",
-        artifact_dir / "validation_seq.pt",
-    )
-    if not force and training_path.exists() and validation_path.exists():
+    training_path = dataset_config.model_path("latent_ode", "training_seq.pt")
+    validation_path = dataset_config.model_path("latent_ode", "validation_seq.pt")
+    if not force and os.path.exists(training_path) and os.path.exists(validation_path):
         return
     ae_config = build_ae_config(dataset_config)
     preprocess_latent_ode(

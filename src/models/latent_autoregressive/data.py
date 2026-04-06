@@ -1,7 +1,7 @@
 """Latent sequence data helpers."""
 
 import gc
-from pathlib import Path
+import os
 
 import numpy as np
 import torch
@@ -81,26 +81,23 @@ def preprocess_latent_autoregressive(
     )
     save_tensors(
         dataset_config,
+        "latent_autoregressive",
         {"dataset": training_dataset[0], "indices": training_dataset[1]},
         category="training_seq",
     )
     save_tensors(
         dataset_config,
+        "latent_autoregressive",
         {"dataset": validation_dataset[0], "indices": validation_dataset[1]},
         category="validation_seq",
     )
 
 
-def artifact_paths(dataset_config) -> tuple[Path, Path]:
-    """Return latent autoregressive cache paths."""
-    artifact_dir = Path(dataset_config.preprocessing_dir) / "latent_autoregressive"
-    return artifact_dir / "training_seq.pt", artifact_dir / "validation_seq.pt"
-
-
 def ensure_preprocessed(dataset_config, force: bool = False) -> None:
     """Build latent autoregressive caches when missing or forced."""
-    training_path, validation_path = artifact_paths(dataset_config)
-    if not force and training_path.exists() and validation_path.exists():
+    training_path = dataset_config.model_path("latent_autoregressive", "training_seq.pt")
+    validation_path = dataset_config.model_path("latent_autoregressive", "validation_seq.pt")
+    if not force and os.path.exists(training_path) and os.path.exists(validation_path):
         return
     ae_config = build_ae_config(dataset_config)
     preprocess_latent_autoregressive(

@@ -165,10 +165,12 @@ def train(dataset_config, force_preprocess: bool = False) -> None:
     ar_config = build_config(dataset_config, ae_config)
     training_tensors = load_tensors(
         dataset_config,
+        "latent_autoregressive",
         category="training_seq",
     )
     validation_tensors = load_tensors(
         dataset_config,
+        "latent_autoregressive",
         category="validation_seq",
     )
     training_dataset = training_tensors["dataset"]

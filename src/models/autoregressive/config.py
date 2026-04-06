@@ -1,6 +1,5 @@
 """Configuration dataclass for abundance-space autoregressive model."""
 
-import os
 from dataclasses import dataclass, field
 
 from src.datasets import DatasetConfig, DatasetName
@@ -18,7 +17,6 @@ class AutoregressiveConfig:
     output_dim: int = field(init=False)
     pretrained_model_path: str = field(init=False)
     save_model_path: str = field(init=False)
-    artifact_name: str = "autoregressive"
 
     hidden_dim: int = 80
     window_size: int = 240
@@ -50,18 +48,8 @@ class AutoregressiveConfig:
         self.num_columns = len(self.columns)
         self.input_dim = self.dataset_config.num_phys + self.dataset_config.num_species
         self.output_dim = self.dataset_config.num_species
-        self.pretrained_model_path = os.path.join(
-            self.dataset_config.weights_dir,
-            f"{self.artifact_name}.pth",
-        )
+        self.pretrained_model_path = self.dataset_config.model_path("autoregressive", "model.pth")
         self.save_model_path = self.pretrained_model_path
-
-
-@dataclass
-class UCLCHEMAutoregressiveConfig(AutoregressiveConfig):
-    """Autoregressive configuration for UCLCHEM."""
-
-    artifact_name: str = "autoregressive_uclchem"
 
 
 @dataclass
@@ -74,7 +62,7 @@ class CarboxAutoregressiveConfig(AutoregressiveConfig):
 
 
 AR_CONFIGS: dict[DatasetName, type[AutoregressiveConfig]] = {
-    DatasetName.UCLCHEM_GRAV: UCLCHEMAutoregressiveConfig,
+    DatasetName.UCLCHEM_GRAV: AutoregressiveConfig,
     DatasetName.CARBOX_GRAV: CarboxAutoregressiveConfig,
 }
 

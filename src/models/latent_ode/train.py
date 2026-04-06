@@ -178,13 +178,13 @@ def train(dataset_config, force_preprocess: bool = False) -> None:
     model_config = build_config(dataset_config, ae_config)
     training_tensors = load_tensors(
         dataset_config,
+        "latent_ode",
         category="training_seq",
-        artifact_dir="latent_ode",
     )
     validation_tensors = load_tensors(
         dataset_config,
+        "latent_ode",
         category="validation_seq",
-        artifact_dir="latent_ode",
     )
 
     training_dataset = LatentODESequenceDataset(

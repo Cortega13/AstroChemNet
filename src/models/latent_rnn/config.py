@@ -1,6 +1,5 @@
 """Configuration dataclass for latent RNN model."""
 
-import os
 from dataclasses import dataclass, field
 
 from src.datasets import DatasetConfig
@@ -52,10 +51,7 @@ class LatentRNNConfig:
         self.num_columns = len(self.columns)
         self.input_dim = self.dataset_config.num_phys + self.ae_config.latent_dim
         self.output_dim = self.ae_config.latent_dim
-        self.pretrained_model_path = os.path.join(
-            self.dataset_config.weights_dir,
-            "latent_rnn.pth",
-        )
+        self.pretrained_model_path = self.dataset_config.model_path("latent_rnn", "model.pth")
         self.save_model_path = self.pretrained_model_path
 
 

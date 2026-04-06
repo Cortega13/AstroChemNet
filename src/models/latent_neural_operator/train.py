@@ -173,13 +173,13 @@ def train(dataset_config, force_preprocess: bool = False) -> None:
     model_config = build_config(dataset_config, ae_config)
     training_tensors = load_tensors(
         dataset_config,
+        "latent_neural_operator",
         category="training_seq",
-        artifact_dir="latent_neural_operator",
     )
     validation_tensors = load_tensors(
         dataset_config,
+        "latent_neural_operator",
         category="validation_seq",
-        artifact_dir="latent_neural_operator",
     )
     training_dataset = training_tensors["dataset"]
     training_indices = training_tensors["indices"]

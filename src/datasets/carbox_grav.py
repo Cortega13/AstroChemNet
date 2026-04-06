@@ -29,7 +29,7 @@ def preprocess_carbox_grav(
       - data/carbox_grav.npy
       - data/carbox_grav_columns.json
 
-    Output (outputs/preprocessed/<dataset_name>/):
+    Output (outputs/<dataset_name>/dataset/):
       - train.npy / val.npy with canonical columns:
         Index, Model, Time, Density, Radfield, Av, gasTemp, <species...>
       - columns.json (mapping for the canonical arrays)
