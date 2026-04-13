@@ -23,7 +23,7 @@ class LatentODEConfig:
 
     hidden_dim: int = 80
     num_hidden_layers: int = 2
-    window_size: int = 240
+    window_size: int = 32
     method: str = "tsit5"
     rtol: float = 1e-2
     atol: float = 1e-3
@@ -57,11 +57,17 @@ class LatentODEConfig:
         self.num_columns = len(self.columns)
         self.input_dim = self.dataset_config.num_phys + self.ae_config.latent_dim
         self.output_dim = self.ae_config.latent_dim
-        self.pretrained_model_path = self.dataset_config.model_path("latent_ode", "model.pth")
+        self.pretrained_model_path = self.dataset_config.model_path(
+            "latent_ode", "model.pth"
+        )
         self.save_model_path = self.pretrained_model_path
         self.base_dt_path = self.dataset_config.model_path("latent_ode", "base_dt.json")
 
 
-def build_config(dataset_config: DatasetConfig, ae_config: AEConfig, **overrides) -> LatentODEConfig:
+def build_config(
+    dataset_config: DatasetConfig, ae_config: AEConfig, **overrides
+) -> LatentODEConfig:
     """Build latent ODE config for a dataset."""
-    return LatentODEConfig(dataset_config=dataset_config, ae_config=ae_config, **overrides)
+    return LatentODEConfig(
+        dataset_config=dataset_config, ae_config=ae_config, **overrides
+    )
